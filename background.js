@@ -3,7 +3,7 @@
 // and shares connection state with tabs through chrome.storage.local:
 //   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline" | "room-full"
 //   peer     { online, name } | null
-//   incoming { from, text, ts, id }   (latest received message)
+//   incoming { id, missed, messages: [{ from, text, ts }] }   (latest received batch)
 
 const SERVER_URL = "wss://bee-onscreen-character.onrender.com";
 const DEFAULTS = { beeEnabled: false, room: "", name: "" };
@@ -115,9 +115,16 @@ async function handleServerMessage(msg) {
       break;
     }
     case "msg": {
-      await chrome.storage.local.set({
-        incoming: { from: msg.from, text: msg.text, ts: msg.ts, id: crypto.randomUUID() },
-      });
+      const messages = [{ from: msg.from, text: msg.text, ts: msg.ts }];
+      await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: false, messages } });
+      break;
+    }
+    case "backlog": {
+      // everything the friend sent while we were offline, in order
+      const messages = (msg.messages || []).map(({ from, text, ts }) => ({ from, text, ts }));
+      if (messages.length) {
+        await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: true, messages } });
+      }
       break;
     }
     case "ack": {

@@ -130,6 +130,39 @@
 .bee-bubble .from { display: block; font-size: 12px; font-weight: 700; color: #b07d00; }
 .bee-bubble.notice .from { color: #2f8f46; }
 
+.bee-messages {
+  display: none;
+  box-sizing: border-box;
+  width: 100%;
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 4px 12px;
+  border: 2.5px solid #3b2a14;
+  border-radius: 14px;
+  background: #fffaf0;
+  color: #3b2a14;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+  pointer-events: auto;
+  cursor: pointer;
+  animation: pop 0.18s ease-out;
+}
+.bee-messages.show { display: block; }
+.bee-messages .missed {
+  margin: 4px 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #a08b6c;
+}
+.bee-messages .msg { padding: 6px 0; overflow-wrap: anywhere; white-space: pre-wrap; }
+.bee-messages .msg + .msg { border-top: 1px dashed #e6dcc8; }
+.bee-messages .meta { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; }
+.bee-messages .from { font-weight: 700; color: #b07d00; }
+.bee-messages .time { color: #a08b6c; }
+.bee-messages .msg.new { animation: pop 0.18s ease-out; }
+
 .antenna-tip { transition: fill 0.3s; }
 .bee.peer-online .antenna-tip { fill: #2ecc71; animation: glow 1.6s ease-in-out infinite; }
 
@@ -201,6 +234,7 @@
       <div class="bee">
         <div class="bee-stack">
           <div class="bee-bubble" role="status"><span class="from"></span><span class="text"></span></div>
+          <div class="bee-messages" role="log" title="Click to dismiss"></div>
           <input class="bee-input" type="text" maxlength="500" autocomplete="off">
         </div>
         <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip">${BEE_SVG}</div></div></div>
@@ -213,6 +247,7 @@
     const input = root.querySelector(".bee-input");
     const stack = root.querySelector(".bee-stack");
     const bubble = root.querySelector(".bee-bubble");
+    const list = root.querySelector(".bee-messages");
     const STACK_W = 240;
     const w = SIZE;
     const h = SIZE * 110 / 140;
@@ -358,6 +393,62 @@
       bubble.classList.remove("show");
     });
 
+    // received messages pile up in one scrollable list until it's dismissed or times out
+    const MAX_SHOWN = 30;
+    let listTimer = null;
+    const timeFmt = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" });
+
+    function hideList() {
+      if (hovering) {
+        listTimer = setTimeout(hideList, 2000); // don't vanish while being read
+        return;
+      }
+      list.classList.remove("show");
+      list.replaceChildren();
+    }
+
+    function addMessages(messages, missed) {
+      if (missed) {
+        const label = document.createElement("div");
+        label.className = "missed";
+        label.textContent = "While you were away";
+        list.append(label);
+      }
+      for (const m of messages) {
+        const row = document.createElement("div");
+        row.className = "msg new";
+        const meta = document.createElement("div");
+        meta.className = "meta";
+        const from = document.createElement("span");
+        from.className = "from";
+        from.textContent = m.from;
+        const time = document.createElement("span");
+        time.className = "time";
+        time.textContent = timeFmt.format(new Date(m.ts));
+        meta.append(from, time);
+        const text = document.createElement("div");
+        text.textContent = m.text;
+        row.append(meta, text);
+        list.append(row);
+      }
+      while (list.querySelectorAll(".msg").length > MAX_SHOWN) list.firstElementChild.remove();
+      list.classList.add("show");
+      list.scrollTop = list.scrollHeight;
+
+      const count = list.querySelectorAll(".msg").length;
+      clearTimeout(listTimer);
+      listTimer = setTimeout(hideList, Math.min(60000, 10000 + 4000 * count));
+    }
+
+    list.addEventListener("click", (e) => {
+      e.stopPropagation();
+      clearTimeout(listTimer);
+      list.classList.remove("show");
+      list.replaceChildren();
+    });
+    // keep scrolling inside the list from scrolling the page
+    list.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
+
     function refreshPlaceholder() {
       const { conn, peer } = chat;
       input.placeholder =
@@ -425,10 +516,12 @@
           spin();
         }
       },
-      onIncoming({ from, text }) {
-        showBubble(from, text);
+      onIncoming({ messages, missed }) {
+        if (!messages?.length) return;
+        addMessages(messages, missed);
         spin();
-        restUntil = performance.now() + 6000; // hover in place so the message is easy to read
+        // hover in place so the messages are easy to read
+        restUntil = performance.now() + Math.min(15000, 4000 + 2000 * messages.length);
       },
     };
   }

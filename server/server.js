@@ -91,7 +91,9 @@ wss.on("connection", (ws) => {
       // deliver anything the friend sent while we were offline
       const forMe = r.pending.filter((p) => p.fromId !== id);
       r.pending = r.pending.filter((p) => p.fromId === id);
-      for (const p of forMe) send(ws, { type: "msg", from: p.from, text: p.text, ts: p.ts });
+      if (forMe.length) {
+        send(ws, { type: "backlog", messages: forMe.map(({ from, text, ts }) => ({ from, text, ts })) });
+      }
       return;
     }
 
