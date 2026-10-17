@@ -78,8 +78,37 @@
   pointer-events: auto;
   cursor: pointer;
   will-change: transform;
-  filter: drop-shadow(0 6px 6px rgba(0,0,0,0.18));
 }
+.bee-spin-wrap { filter: drop-shadow(0 6px 6px rgba(0,0,0,0.18)); }
+
+.bee-input {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  z-index: 1;
+  left: 0;
+  width: 220px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 2.5px solid #3b2a14;
+  border-radius: 14px;
+  background: #fffaf0;
+  color: #3b2a14;
+  font: 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
+  outline: none;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+  cursor: text;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+.bee-input.below { bottom: auto; top: calc(100% + 6px); }
+.bee-input::placeholder { color: #a08b6c; }
+.bee-input:focus { border-color: #e0a800; box-shadow: 0 0 0 3px rgba(255,194,26,0.4), 0 4px 10px rgba(0,0,0,0.18); }
+.bee.open .bee-input { opacity: 1; visibility: visible; pointer-events: auto; transform: none; }
+.bee.open .bee-bob { animation-play-state: paused; }
+
 .bee-flip { transition: transform 0.35s ease; }
 .bee-flip.left { transform: scaleX(-1); }
 .bee-bob { animation: bob 1.4s ease-in-out infinite; }
@@ -128,7 +157,8 @@
     host = document.createElement("buzzy-bee-root");
     const root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `<style>${STYLE}</style>
-      <div class="bee" title="Bzzz! Click me">
+      <div class="bee">
+        <input class="bee-input" type="text" placeholder="Say something to Buzzy…" maxlength="200" autocomplete="off" spellcheck="false">
         <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip">${BEE_SVG}</div></div></div>
       </div>`;
     document.documentElement.appendChild(host);
@@ -136,6 +166,9 @@
     const bee = root.querySelector(".bee");
     const flip = root.querySelector(".bee-flip");
     const spinWrap = root.querySelector(".bee-spin-wrap");
+    const input = root.querySelector(".bee-input");
+    const INPUT_W = 220;
+    const INPUT_H = 40;
     const w = SIZE;
     const h = SIZE * 110 / 140;
 
@@ -155,6 +188,33 @@
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const speed = reducedMotion ? 0.4 : 1;
 
+    let hovering = false;
+    let prevFocus = null; // page element that had focus before we grabbed it
+    const isOpen = () => hovering || input === root.activeElement;
+
+    function open() {
+      bee.classList.add("open");
+      vel.x = vel.y = 0;
+      if (input !== root.activeElement) {
+        prevFocus = document.activeElement;
+        input.focus({ preventScroll: true });
+      }
+    }
+
+    function close() {
+      if (isOpen()) return;
+      bee.classList.remove("open");
+      restUntil = performance.now() + 500; // brief pause before flying off
+    }
+
+    function placeInput() {
+      // keep the input fully on screen: flip below the bee near the top edge,
+      // and shift sideways near the left/right edges
+      input.classList.toggle("below", pos.y < INPUT_H + 8);
+      const left = Math.min(Math.max((w - INPUT_W) / 2, 8 - pos.x), window.innerWidth - 8 - pos.x - INPUT_W);
+      input.style.left = `${left}px`;
+    }
+
     function tick(now) {
       const dt = Math.min(50, now - last) / 16.67; // frames at 60fps
       last = now;
@@ -163,7 +223,9 @@
       const dy = target.y - pos.y;
       const dist = Math.hypot(dx, dy);
 
-      if (now > restUntil) {
+      if (isOpen()) {
+        // stay put while the user is hovering or typing
+      } else if (now > restUntil) {
         if (dist < 20) {
           restUntil = now + 600 + Math.random() * 1800; // hover in place a moment
           target = randomTarget();
@@ -188,16 +250,45 @@
       else if (vel.x > 0.3 && facingLeft) { facingLeft = false; flip.classList.remove("left"); }
 
       bee.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
+      placeInput();
       rafId = requestAnimationFrame(tick);
     }
     rafId = requestAnimationFrame(tick);
 
-    bee.addEventListener("click", () => {
+    let leaveTimer = null;
+    bee.addEventListener("mouseenter", () => {
+      clearTimeout(leaveTimer);
+      hovering = true;
+      open();
+    });
+    bee.addEventListener("mouseleave", () => {
+      // short grace period so crossing the gap between bee and input doesn't close it
+      leaveTimer = setTimeout(() => {
+        hovering = false;
+        // nothing typed yet: give focus back to the page and fly on.
+        // text in progress: stay open until the user clicks elsewhere.
+        if (!input.value && input === root.activeElement) {
+          input.blur();
+          prevFocus?.focus?.({ preventScroll: true });
+        }
+        close();
+      }, 250);
+    });
+    input.addEventListener("blur", close);
+
+    // keep keystrokes from triggering the page's own keyboard shortcuts
+    for (const type of ["keydown", "keyup", "keypress"]) {
+      input.addEventListener(type, (e) => e.stopPropagation());
+    }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") input.blur();
+    });
+
+    spinWrap.addEventListener("click", () => {
       spinWrap.classList.remove("bee-spin");
       void spinWrap.offsetWidth; // restart animation
       spinWrap.classList.add("bee-spin");
-      target = randomTarget();
-      restUntil = 0;
+      input.focus({ preventScroll: true });
     });
   }
 
