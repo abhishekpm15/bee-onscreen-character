@@ -20,7 +20,29 @@
     <span class="switch" aria-hidden="true"></span>
   </label>
 
-  <p class="hint">Click Buzzy on the page to make it spin.</p>
+  <section class="chat">
+    <div class="chat-head">
+      <h2>Chat</h2>
+      <span id="conn" class="conn"><span class="dot"></span><span id="conn-text">Not set up</span></span>
+    </div>
+
+    <form id="settings">
+      <label>Your name
+        <input id="name" maxlength="40" placeholder="e.g. Sam" required>
+      </label>
+      <label>Room code
+        <span class="row">
+          <input id="room" maxlength="64" placeholder="Share this with your friend" required>
+          <button type="button" id="gen" title="Make a new random code">New</button>
+        </span>
+      </label>
+      <label>Server
+        <input id="server" placeholder="wss://your-server.example.com" required>
+      </label>
+      <button type="submit" id="save">Save &amp; connect</button>
+    </form>
+    <p class="hint">You and your friend enter the same room code and server.</p>
+  </section>
 
   <script src="popup.js"></script>
 </body>

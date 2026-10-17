@@ -42,8 +42,8 @@
     <path d="M102 34 q-2 -16 -12 -22"/>
     <path d="M110 36 q6 -15 18 -18"/>
   </g>
-  <circle cx="89" cy="11" r="5" fill="#3b2a14"/>
-  <circle cx="129" cy="17" r="5" fill="#3b2a14"/>
+  <circle class="antenna-tip" cx="89" cy="11" r="5" fill="#3b2a14"/>
+  <circle class="antenna-tip" cx="129" cy="17" r="5" fill="#3b2a14"/>
 
   <!-- head -->
   <circle cx="106" cy="58" r="24" fill="#ffd23f" stroke="#3b2a14" stroke-width="3.5"/>
@@ -81,32 +81,58 @@
 }
 .bee-spin-wrap { filter: drop-shadow(0 6px 6px rgba(0,0,0,0.18)); }
 
-.bee-input {
+.bee-stack {
   position: absolute;
   bottom: calc(100% + 6px);
-  z-index: 1;
   left: 0;
-  width: 220px;
+  z-index: 1;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  pointer-events: none;
+  font: 14px/1.35 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.bee-stack.below { bottom: auto; top: calc(100% + 6px); flex-direction: column-reverse; }
+
+.bee-input, .bee-bubble {
   box-sizing: border-box;
-  padding: 8px 12px;
+  width: 100%;
   border: 2.5px solid #3b2a14;
   border-radius: 14px;
   background: #fffaf0;
   color: #3b2a14;
-  font: 14px/1.3 system-ui, -apple-system, "Segoe UI", sans-serif;
-  outline: none;
+  font: inherit;
   box-shadow: 0 4px 10px rgba(0,0,0,0.18);
-  cursor: text;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateY(6px);
-  transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+  pointer-events: auto;
+  animation: pop 0.18s ease-out;
 }
-.bee-input.below { bottom: auto; top: calc(100% + 6px); }
+.bee-input {
+  display: none;
+  padding: 8px 12px;
+  outline: none;
+  cursor: text;
+}
 .bee-input::placeholder { color: #a08b6c; }
 .bee-input:focus { border-color: #e0a800; box-shadow: 0 0 0 3px rgba(255,194,26,0.4), 0 4px 10px rgba(0,0,0,0.18); }
-.bee.open .bee-input { opacity: 1; visibility: visible; pointer-events: auto; transform: none; }
+.bee-input.error { border-color: #d64545; animation: shake 0.3s; }
+.bee.open .bee-input { display: block; }
+
+.bee-bubble {
+  display: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.bee-bubble.show { display: block; }
+.bee-bubble.notice { background: #eafbea; border-color: #2f8f46; }
+.bee-bubble .from { display: block; font-size: 12px; font-weight: 700; color: #b07d00; }
+.bee-bubble.notice .from { color: #2f8f46; }
+
+.antenna-tip { transition: fill 0.3s; }
+.bee.peer-online .antenna-tip { fill: #2ecc71; animation: glow 1.6s ease-in-out infinite; }
+
 .bee.open .bee-bob { animation-play-state: paused; }
 
 .bee-flip { transition: transform 0.35s ease; }
@@ -141,6 +167,19 @@
   from { transform: rotate(-12deg); }
   to   { transform: rotate(12deg); }
 }
+@keyframes pop {
+  from { opacity: 0; transform: translateY(6px) scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+@keyframes glow {
+  0%, 100% { filter: drop-shadow(0 0 1px #2ecc71); }
+  50%      { filter: drop-shadow(0 0 6px #2ecc71); }
+}
 @keyframes spin {
   0%   { transform: rotate(0) scale(1); }
   50%  { transform: rotate(180deg) scale(1.25); }
@@ -152,13 +191,18 @@
 
   let host = null;
   let rafId = null;
+  let ui = null; // chat hooks returned by createBee
+  const chat = { conn: "unconfigured", peer: null };
 
   function createBee() {
     host = document.createElement("buzzy-bee-root");
     const root = host.attachShadow({ mode: "closed" });
     root.innerHTML = `<style>${STYLE}</style>
       <div class="bee">
-        <input class="bee-input" type="text" placeholder="Say something to Buzzy…" maxlength="200" autocomplete="off" spellcheck="false">
+        <div class="bee-stack">
+          <div class="bee-bubble" role="status"><span class="from"></span><span class="text"></span></div>
+          <input class="bee-input" type="text" maxlength="500" autocomplete="off">
+        </div>
         <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip">${BEE_SVG}</div></div></div>
       </div>`;
     document.documentElement.appendChild(host);
@@ -167,8 +211,9 @@
     const flip = root.querySelector(".bee-flip");
     const spinWrap = root.querySelector(".bee-spin-wrap");
     const input = root.querySelector(".bee-input");
-    const INPUT_W = 220;
-    const INPUT_H = 40;
+    const stack = root.querySelector(".bee-stack");
+    const bubble = root.querySelector(".bee-bubble");
+    const STACK_W = 240;
     const w = SIZE;
     const h = SIZE * 110 / 140;
 
@@ -207,12 +252,12 @@
       restUntil = performance.now() + 500; // brief pause before flying off
     }
 
-    function placeInput() {
-      // keep the input fully on screen: flip below the bee near the top edge,
-      // and shift sideways near the left/right edges
-      input.classList.toggle("below", pos.y < INPUT_H + 8);
-      const left = Math.min(Math.max((w - INPUT_W) / 2, 8 - pos.x), window.innerWidth - 8 - pos.x - INPUT_W);
-      input.style.left = `${left}px`;
+    function placeStack() {
+      // keep the input/bubble fully on screen: flip below the bee near the top
+      // edge, and shift sideways near the left/right edges
+      stack.classList.toggle("below", pos.y < stack.offsetHeight + 8);
+      const left = Math.min(Math.max((w - STACK_W) / 2, 8 - pos.x), window.innerWidth - 8 - pos.x - STACK_W);
+      stack.style.left = `${left}px`;
     }
 
     function tick(now) {
@@ -250,7 +295,7 @@
       else if (vel.x > 0.3 && facingLeft) { facingLeft = false; flip.classList.remove("left"); }
 
       bee.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
-      placeInput();
+      placeStack();
       rafId = requestAnimationFrame(tick);
     }
     rafId = requestAnimationFrame(tick);
@@ -284,12 +329,108 @@
       if (e.key === "Escape") input.blur();
     });
 
-    spinWrap.addEventListener("click", () => {
+    function spin() {
       spinWrap.classList.remove("bee-spin");
       void spinWrap.offsetWidth; // restart animation
       spinWrap.classList.add("bee-spin");
+    }
+
+    spinWrap.addEventListener("click", () => {
+      spin();
       input.focus({ preventScroll: true });
     });
+
+    // ---- chat ----
+
+    let bubbleTimer = null;
+    function showBubble(from, text, { notice = false, ms = 10000 } = {}) {
+      bubble.querySelector(".from").textContent = from;
+      bubble.querySelector(".text").textContent = text;
+      bubble.classList.toggle("notice", notice);
+      bubble.classList.remove("show");
+      void bubble.offsetWidth; // replay the pop-in animation
+      bubble.classList.add("show");
+      clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => bubble.classList.remove("show"), ms);
+    }
+    bubble.addEventListener("click", (e) => {
+      e.stopPropagation();
+      bubble.classList.remove("show");
+    });
+
+    function refreshPlaceholder() {
+      const { conn, peer } = chat;
+      input.placeholder =
+        conn === "unconfigured" ? "Set up chat in the Buzzy menu first" :
+        conn === "room-full" ? "That room already has two people" :
+        conn !== "online" ? "Connecting to chat…" :
+        peer?.online ? `Message ${peer.name}…` :
+        "Friend is offline — they'll get it later";
+    }
+
+    let statusTimer = null;
+    function flashStatus(text) {
+      input.placeholder = text;
+      clearTimeout(statusTimer);
+      statusTimer = setTimeout(refreshPlaceholder, 2000);
+    }
+
+    function flashError(text) {
+      input.classList.remove("error");
+      void input.offsetWidth;
+      input.classList.add("error");
+      setTimeout(() => input.classList.remove("error"), 1500);
+      showBubble("Buzzy", text, { ms: 4000 });
+    }
+
+    let sending = false;
+    async function sendTyped() {
+      const text = input.value.trim();
+      if (!text || sending) return;
+      if (chat.conn !== "online") return flashError(input.placeholder);
+      sending = true;
+      let res;
+      try {
+        res = await chrome.runtime.sendMessage({ type: "send", text });
+      } catch {
+        res = { ok: false, reason: "extension-reloaded" };
+      }
+      sending = false;
+      if (!res?.ok) {
+        return flashError(res?.reason === "extension-reloaded"
+          ? "Buzzy was updated — refresh this page"
+          : "Couldn't send. Try again in a moment.");
+      }
+      input.value = "";
+      flashStatus(res.delivered ? "Sent ✓" : "Saved — it'll arrive when they're online");
+    }
+
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.isComposing) {
+        e.preventDefault();
+        sendTyped();
+      }
+    });
+
+    refreshPlaceholder();
+    bee.classList.toggle("peer-online", !!chat.peer?.online);
+
+    return {
+      onChat(prev) {
+        refreshPlaceholder();
+        const online = !!chat.peer?.online;
+        bee.classList.toggle("peer-online", online);
+        if (online && !prev.peer?.online) {
+          showBubble(chat.peer.name, "is online now 👋", { notice: true, ms: 5000 });
+          spin();
+        }
+      },
+      onIncoming({ from, text }) {
+        showBubble(from, text);
+        spin();
+        restUntil = performance.now() + 6000; // hover in place so the message is easy to read
+      },
+    };
   }
 
   function removeBee() {
@@ -297,15 +438,29 @@
     rafId = null;
     host?.remove();
     host = null;
+    ui = null;
   }
 
   function apply(enabled) {
-    if (enabled && !host) createBee();
+    if (enabled && !host) ui = createBee();
     else if (!enabled && host) removeBee();
   }
 
-  chrome.storage.local.get({ beeEnabled: false }, ({ beeEnabled }) => apply(beeEnabled));
+  chrome.storage.local.get({ beeEnabled: false, conn: "unconfigured", peer: null }, (s) => {
+    chat.conn = s.conn;
+    chat.peer = s.peer;
+    apply(s.beeEnabled);
+  });
+
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && "beeEnabled" in changes) apply(changes.beeEnabled.newValue);
+    if (area !== "local") return;
+    if ("conn" in changes || "peer" in changes) {
+      const prev = { ...chat };
+      if ("conn" in changes) chat.conn = changes.conn.newValue;
+      if ("peer" in changes) chat.peer = changes.peer.newValue;
+      ui?.onChat(prev);
+    }
+    if ("incoming" in changes && changes.incoming.newValue) ui?.onIncoming(changes.incoming.newValue);
+    if ("beeEnabled" in changes) apply(changes.beeEnabled.newValue);
   });
 })();

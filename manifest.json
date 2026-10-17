@@ -1,9 +1,9 @@
 {
   "manifest_version": 3,
   "name": "Buzzy the Bee",
-  "version": "1.0.0",
-  "description": "A cartoon bee that flutters around your screen. Toggle it on and off from the toolbar.",
-  "permissions": ["storage", "scripting"],
+  "version": "1.1.0",
+  "description": "A cartoon bee that flutters around your screen and carries chat messages between you and a friend.",
+  "permissions": ["storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"

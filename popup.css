@@ -66,3 +66,48 @@ input:checked + .switch::after { transform: translateX(18px); }
 input:focus-visible + .switch { outline: 2px solid var(--text); outline-offset: 2px; }
 
 .hint { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+
+.chat {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--track);
+}
+.chat-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+h2 { margin: 0; font-size: 14px; }
+
+.conn { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.conn .dot { width: 8px; height: 8px; border-radius: 50%; background: #c9bda6; }
+.conn.ok .dot { background: var(--accent); }
+.conn.live .dot { background: #2ecc71; box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.25); }
+.conn.live { color: #2f8f46; font-weight: 600; }
+.conn.bad .dot { background: #d64545; }
+.conn.bad { color: #b03636; }
+
+form { display: grid; gap: 10px; }
+form label { display: grid; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+form input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--track);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+form input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+.row { display: flex; gap: 6px; }
+button {
+  padding: 7px 10px;
+  border: 1px solid var(--track);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+button:hover { background: #fff3d1; }
+#save { background: var(--accent); border-color: var(--accent); }
+#save:hover { background: #f2b500; }
