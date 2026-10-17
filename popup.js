@@ -14,6 +14,7 @@ function render(enabled) {
 
 function renderConn({ conn: state = "unconfigured", peer = null }) {
   const labels = {
+    disabled: "Off — turn on the bee to chat",
     unconfigured: "Not set up",
     connecting: "Connecting…",
     offline: "Can't reach server",
@@ -38,10 +39,6 @@ chrome.storage.local.get(
     renderConn(s);
   }
 );
-
-// opening the popup counts as reading any messages that arrived while the bee was hidden
-chrome.storage.local.set({ unread: 0 });
-chrome.action.setBadgeText({ text: "" });
 
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local" || !("conn" in changes || "peer" in changes)) return;

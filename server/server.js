@@ -25,6 +25,11 @@ function others(room, clientId) {
   return [...room.clients].filter(([id]) => id !== clientId).map(([, c]) => c);
 }
 
+// peers that can actually receive right now (not mid-close)
+function reachable(room, clientId) {
+  return others(room, clientId).filter((c) => c.ws.readyState === c.ws.OPEN);
+}
+
 wss.on("connection", (ws) => {
   let room = null;
   let roomCode = null;
@@ -33,6 +38,14 @@ wss.on("connection", (ws) => {
 
   ws.isAlive = true;
   ws.on("pong", () => (ws.isAlive = true));
+
+  // remove this socket from its room and tell the friend; safe to call twice
+  function leave() {
+    if (!room || room.clients.get(clientId)?.ws !== ws) return; // replaced by a newer socket
+    room.clients.delete(clientId);
+    for (const c of others(room, clientId)) send(c.ws, { type: "presence", online: false, name });
+    if (!room.clients.size && !room.pending.length) rooms.delete(roomCode);
+  }
 
   ws.on("message", (raw) => {
     let msg;
@@ -84,11 +97,18 @@ wss.on("connection", (ws) => {
 
     if (!room) return;
 
+    // client is going offline on purpose (bee turned off): update presence now
+    // rather than waiting for the close handshake, so nothing is sent into a closing socket
+    if (msg.type === "bye") {
+      leave();
+      return ws.close(1000, "bye");
+    }
+
     if (msg.type === "msg") {
       const text = String(msg.text || "").trim().slice(0, MAX_TEXT);
       if (!text) return;
       const out = { type: "msg", from: name, text, ts: Date.now() };
-      const peers = others(room, clientId);
+      const peers = reachable(room, clientId);
       for (const c of peers) send(c.ws, out);
       if (!peers.length) {
         room.pending.push({ fromId: clientId, from: name, text, ts: out.ts });
@@ -98,12 +118,7 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => {
-    if (!room || room.clients.get(clientId)?.ws !== ws) return; // replaced by a newer socket
-    room.clients.delete(clientId);
-    for (const c of others(room, clientId)) send(c.ws, { type: "presence", online: false, name });
-    if (!room.clients.size && !room.pending.length) rooms.delete(roomCode);
-  });
+  ws.on("close", leave);
 });
 
 // drop connections that silently died (laptop closed, network lost) so presence stays accurate

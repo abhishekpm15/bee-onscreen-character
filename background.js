@@ -1,12 +1,13 @@
-// Keeps one WebSocket to the chat server for the whole browser and shares
-// connection state with tabs through chrome.storage.local:
-//   conn     "unconfigured" | "connecting" | "online" | "offline" | "room-full"
+// Keeps one WebSocket to the chat server for the whole browser while the bee
+// is turned on (turning it off disconnects, so the friend sees you go offline),
+// and shares connection state with tabs through chrome.storage.local:
+//   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline" | "room-full"
 //   peer     { online, name } | null
 //   incoming { from, text, ts, id }   (latest received message)
 
 const SERVER_URL = "wss://bee-onscreen-character.onrender.com";
-const DEFAULTS = { room: "", name: "" };
-const SETTING_KEYS = ["room", "name"];
+const DEFAULTS = { beeEnabled: false, room: "", name: "" };
+const SETTING_KEYS = ["beeEnabled", "room", "name"];
 
 let ws = null;
 let connecting = false;
@@ -39,7 +40,11 @@ async function connect() {
   if (connecting || (ws && ws.readyState <= WebSocket.OPEN)) return;
   connecting = true;
   try {
-    const { room, name } = await chrome.storage.local.get(DEFAULTS);
+    const { beeEnabled, room, name } = await chrome.storage.local.get(DEFAULTS);
+    if (!beeEnabled) {
+      await chrome.storage.local.set({ conn: "disabled", peer: null });
+      return;
+    }
     if (!room || !name) {
       await chrome.storage.local.set({ conn: "unconfigured", peer: null });
       return;
@@ -57,7 +62,13 @@ async function connect() {
     }
     ws = sock;
 
-    sock.onopen = () => {
+    sock.onopen = async () => {
+      // the bee may have been turned off while this socket was opening
+      if (!(await chrome.storage.local.get(DEFAULTS)).beeEnabled) {
+        if (ws === sock) ws = null;
+        sock.close();
+        return;
+      }
       retryDelay = 1000;
       sock.send(JSON.stringify({ type: "hello", room, clientId, name }));
       chrome.storage.local.set({ conn: "online" });
@@ -107,13 +118,6 @@ async function handleServerMessage(msg) {
       await chrome.storage.local.set({
         incoming: { from: msg.from, text: msg.text, ts: msg.ts, id: crypto.randomUUID() },
       });
-      // the bee shows messages itself; badge the toolbar icon only when it's hidden
-      const { beeEnabled, unread = 0 } = await chrome.storage.local.get(["beeEnabled", "unread"]);
-      if (!beeEnabled) {
-        await chrome.storage.local.set({ unread: unread + 1 });
-        chrome.action.setBadgeBackgroundColor({ color: "#e0a800" });
-        chrome.action.setBadgeText({ text: String(unread + 1) });
-      }
       break;
     }
     case "ack": {
@@ -131,6 +135,7 @@ function reconnect() {
     const old = ws;
     ws = null; // so its onclose doesn't schedule a retry
     clearInterval(pingTimer);
+    if (old.readyState === WebSocket.OPEN) old.send('{"type":"bye"}');
     old.close();
   }
   chrome.storage.local.set({ peer: null });
