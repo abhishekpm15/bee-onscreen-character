@@ -3,7 +3,6 @@ const status = document.getElementById("status");
 const form = document.getElementById("settings");
 const nameInput = document.getElementById("name");
 const roomInput = document.getElementById("room");
-const serverInput = document.getElementById("server");
 const saveBtn = document.getElementById("save");
 const conn = document.getElementById("conn");
 const connText = document.getElementById("conn-text");
@@ -31,12 +30,11 @@ function renderConn({ conn: state = "unconfigured", peer = null }) {
 }
 
 chrome.storage.local.get(
-  { beeEnabled: false, name: "", room: "", serverUrl: "ws://localhost:8080", conn: "unconfigured", peer: null },
+  { beeEnabled: false, name: "", room: "", conn: "unconfigured", peer: null },
   (s) => {
     render(s.beeEnabled);
     nameInput.value = s.name;
     roomInput.value = s.room;
-    serverInput.value = s.serverUrl;
     renderConn(s);
   }
 );
@@ -63,18 +61,10 @@ document.getElementById("gen").addEventListener("click", () => {
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  const serverUrl = serverInput.value.trim();
-  if (!/^wss?:\/\//i.test(serverUrl)) {
-    serverInput.setCustomValidity("Must start with ws:// or wss://");
-    serverInput.reportValidity();
-    return;
-  }
   chrome.storage.local.set({
     name: nameInput.value.trim(),
     room: roomInput.value.trim(),
-    serverUrl,
   });
   saveBtn.textContent = "Saved ✓";
   setTimeout(() => (saveBtn.textContent = "Save & connect"), 1500);
 });
-serverInput.addEventListener("input", () => serverInput.setCustomValidity(""));

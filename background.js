@@ -4,8 +4,9 @@
 //   peer     { online, name } | null
 //   incoming { from, text, ts, id }   (latest received message)
 
-const DEFAULTS = { serverUrl: "ws://localhost:8080", room: "", name: "" };
-const SETTING_KEYS = ["serverUrl", "room", "name"];
+const SERVER_URL = "wss://bee-onscreen-character.onrender.com";
+const DEFAULTS = { room: "", name: "" };
+const SETTING_KEYS = ["room", "name"];
 
 let ws = null;
 let connecting = false;
@@ -38,8 +39,8 @@ async function connect() {
   if (connecting || (ws && ws.readyState <= WebSocket.OPEN)) return;
   connecting = true;
   try {
-    const { serverUrl, room, name } = await chrome.storage.local.get(DEFAULTS);
-    if (!serverUrl || !room || !name) {
+    const { room, name } = await chrome.storage.local.get(DEFAULTS);
+    if (!room || !name) {
       await chrome.storage.local.set({ conn: "unconfigured", peer: null });
       return;
     }
@@ -48,7 +49,7 @@ async function connect() {
 
     let sock;
     try {
-      sock = new WebSocket(serverUrl);
+      sock = new WebSocket(SERVER_URL);
     } catch {
       await chrome.storage.local.set({ conn: "offline", peer: null });
       scheduleRetry();

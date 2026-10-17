@@ -28,11 +28,13 @@ it wakes. Use an always-on plan if that matters.
 
 ## Connect
 
+The extension connects to `wss://bee-onscreen-character.onrender.com`
+(set in `SERVER_URL` at the top of `background.js`).
+
 1. Both people load the extension (`chrome://extensions` → Developer mode → Load unpacked).
 2. Open the Buzzy popup → **Chat**:
    - **Your name** — what your friend sees
    - **Room code** — click **New**, then send the code to your friend; they paste the same code
-   - **Server** — your deployed `wss://…` URL
 3. Click **Save & connect**. When both are connected, each bee's antennae glow green
    and it announces "*name* is online now 👋".
 4. Hover the bee, type, press **Enter**. Messages sent while your friend is offline
