@@ -72,8 +72,9 @@ for (const tab of tabs) {
 
 // ---- style ----
 
-const { PRESETS, OPTIONS, DEFAULT_SKIN, normalize, svg } = BuzzyBeeArt;
+const { PRESETS, OPTIONS, DEFAULT_SKIN, MAX_BEES, normalize, skinForBee, svg } = BuzzyBeeArt;
 let skin = { ...DEFAULT_SKIN };
+const swarm = { beeCount: 1, randomOutfits: false, randomSeed: 1 };
 
 const COLOR_FIELDS = [
   ["body", "Body"],
@@ -135,7 +136,28 @@ for (const [key, label] of PART_FIELDS) {
 document.getElementById("reset").addEventListener("click", () => update({ ...DEFAULT_SKIN }));
 
 function renderStyle() {
-  preview.innerHTML = svg(skin, { width: 150, uid: "preview" });
+  // the chat bee big, companions small, each in the look it will have on the page
+  const looks = { skin, ...swarm };
+  preview.innerHTML = "";
+  for (let i = 0; i < swarm.beeCount; i++) {
+    const b = document.createElement("div");
+    b.className = i === 0 ? "preview-bee main" : "preview-bee";
+    b.style.animationDelay = `${-i * 0.37}s`;
+    const width = i === 0 ? (swarm.beeCount > 1 ? 110 : 150) : 58;
+    b.innerHTML = svg(skinForBee(i, looks), { width, uid: `preview-${i}` });
+    preview.append(b);
+  }
+  preview.classList.toggle("many", swarm.beeCount > 1);
+
+  document.getElementById("count").value = swarm.beeCount;
+  document.getElementById("count-label").textContent = swarm.beeCount === 1 ? "bee" : "bees";
+  document.getElementById("dec").disabled = swarm.beeCount <= 1;
+  document.getElementById("inc").disabled = swarm.beeCount >= MAX_BEES;
+  document.getElementById("random").checked = swarm.randomOutfits;
+  document.getElementById("shuffle").hidden = !swarm.randomOutfits;
+  document.getElementById("custom").classList.toggle("locked", swarm.randomOutfits);
+  document.getElementById("locked-hint").hidden = !swarm.randomOutfits;
+
   for (const input of colorsEl.querySelectorAll("input")) input.value = skin[input.dataset.key];
   for (const select of partsEl.querySelectorAll("select")) select.value = skin[select.dataset.key];
   for (const btn of presetsEl.children) {
@@ -158,12 +180,36 @@ function update(next) {
   }, 120);
 }
 
+// ---- swarm ----
+
+function setSwarm(patch) {
+  Object.assign(swarm, patch);
+  renderStyle();
+  chrome.storage.local.set(patch);
+}
+document.getElementById("dec").addEventListener("click", () => setSwarm({ beeCount: Math.max(1, swarm.beeCount - 1) }));
+document.getElementById("inc").addEventListener("click", () => setSwarm({ beeCount: Math.min(MAX_BEES, swarm.beeCount + 1) }));
+const newSeed = () => crypto.getRandomValues(new Uint32Array(1))[0];
+document.getElementById("random").addEventListener("change", (e) => {
+  // a fresh roll each time it's switched on
+  setSwarm(e.target.checked ? { randomOutfits: true, randomSeed: newSeed() } : { randomOutfits: false });
+});
+document.getElementById("shuffle").addEventListener("click", () => setSwarm({ randomSeed: newSeed() }));
+
 // load saved state last, once every element and function above exists
 chrome.storage.local.get(
-  { beeEnabled: false, name: "", room: "", conn: "unconfigured", peer: null, skin: null },
+  {
+    beeEnabled: false, name: "", room: "", conn: "unconfigured", peer: null,
+    skin: null, beeCount: 1, randomOutfits: false, randomSeed: 1,
+  },
   (s) => {
     render(s.beeEnabled);
     skin = BuzzyBeeArt.normalize(s.skin);
+    Object.assign(swarm, {
+      beeCount: Math.min(Math.max(s.beeCount | 0, 1), MAX_BEES),
+      randomOutfits: s.randomOutfits,
+      randomSeed: s.randomSeed,
+    });
     renderStyle();
     nameInput.value = s.name;
     roomInput.value = s.room;

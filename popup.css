@@ -93,13 +93,44 @@ h2 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spac
 /* ---- style panel ---- */
 .preview {
   display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
   justify-content: center;
-  padding: 26px 0 8px;
+  gap: 2px 6px;
+  min-height: 150px;
+  padding: 26px 8px 10px;
+  box-sizing: border-box;
   border-radius: 12px;
   background: radial-gradient(circle at 50% 60%, #fff 0%, #fff3d1 70%);
   border: 1px solid var(--track);
 }
 .preview-bee { animation: bob 1.4s ease-in-out infinite; }
+.preview.many .preview-bee.main { flex-basis: 100%; display: flex; justify-content: center; }
+
+.swarm { display: grid; gap: 8px; }
+.stepper { display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.stepper button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+}
+.stepper button:disabled { opacity: 0.4; cursor: default; background: #fff; }
+.stepper output { min-width: 1.2em; text-align: center; font-size: 18px; }
+.check { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.check input { width: 16px; height: 16px; accent-color: #e0a800; margin: 0; }
+#shuffle { justify-self: start; }
+
+.locked > :not(.locked-hint) { opacity: 0.4; pointer-events: none; }
+.locked-hint {
+  margin: 14px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff3d1;
+  font-size: 12px;
+}
 @keyframes bob {
   0%, 100% { transform: translateY(-4px) rotate(-3deg); }
   50%      { transform: translateY(4px) rotate(3deg); }

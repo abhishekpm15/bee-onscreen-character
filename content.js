@@ -131,36 +131,47 @@
   .bee-bob { animation-duration: 3s; }
 }`;
 
-  let host = null;
+  let host = null; // one shadow root holds every bee on the page
+  let root = null;
   let rafId = null;
-  let ui = null; // chat hooks returned by createBee
+  const bees = []; // bees[0] is the chat bee; the rest just fly around
   const chat = { conn: "unconfigured", peer: null };
-  let skin = null; // bee look, from the popup's Style tab
+  // look + swarm settings, from the popup's Style tab
+  const looks = { skin: null, randomOutfits: false, randomSeed: 1 };
+  let beeCount = 1;
 
-  function createBee() {
-    host = document.createElement("buzzy-bee-root");
-    const root = host.attachShadow({ mode: "closed" });
-    root.innerHTML = `<style>${BuzzyBeeArt.CSS}${STYLE}</style>
-      <div class="bee">
-        <div class="bee-stack">
+  // index 0 is the chat bee (input box, messages, online ring); others are companions
+  function createBee(index) {
+    const main = index === 0;
+    const size = main ? SIZE : Math.round(SIZE * 0.8);
+    const bee = document.createElement("div");
+    bee.className = "bee";
+    bee.innerHTML = `
+        ${main ? `<div class="bee-stack">
           <div class="bee-bubble" role="status"><span class="from"></span><span class="text"></span></div>
           <div class="bee-messages" role="log" title="Click to dismiss"></div>
           <input class="bee-input" type="text" maxlength="500" autocomplete="off">
-        </div>
-        <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip">${BuzzyBeeArt.svg(skin, { width: SIZE, uid: "page" })}</div></div></div>
-      </div>`;
-    document.documentElement.appendChild(host);
+        </div>` : ""}
+        <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip"></div></div></div>`;
+    root.append(bee);
 
-    const bee = root.querySelector(".bee");
-    const flip = root.querySelector(".bee-flip");
-    const spinWrap = root.querySelector(".bee-spin-wrap");
-    const input = root.querySelector(".bee-input");
-    const stack = root.querySelector(".bee-stack");
-    const bubble = root.querySelector(".bee-bubble");
-    const list = root.querySelector(".bee-messages");
+    const flip = bee.querySelector(".bee-flip");
+    const spinWrap = bee.querySelector(".bee-spin-wrap");
+    const input = bee.querySelector(".bee-input");
+    const stack = bee.querySelector(".bee-stack");
+    const bubble = bee.querySelector(".bee-bubble");
+    const list = bee.querySelector(".bee-messages");
     const STACK_W = 240;
-    const w = SIZE;
-    const h = HEIGHT;
+    const w = size;
+    const h = size * 110 / 140;
+
+    // each bee bobs on its own rhythm so a swarm doesn't move in lockstep
+    bee.querySelector(".bee-bob").style.animationDelay = `${-index * 0.37}s`;
+
+    function setSkin() {
+      flip.innerHTML = BuzzyBeeArt.svg(BuzzyBeeArt.skinForBee(index, looks), { width: size, uid: `page-${index}` });
+    }
+    setSkin();
 
     const bounds = () => ({ maxX: window.innerWidth - w, maxY: window.innerHeight - h });
     const randomTarget = () => {
@@ -169,7 +180,7 @@
     };
 
     const { maxX, maxY } = bounds();
-    let pos = { x: maxX * 0.8, y: maxY * 0.3 };
+    let pos = main ? { x: maxX * 0.8, y: maxY * 0.3 } : randomTarget();
     let vel = { x: 0, y: 0 };
     let target = randomTarget();
     let restUntil = 0;
@@ -180,12 +191,12 @@
 
     let hovering = false;
     let prevFocus = null; // page element that had focus before we grabbed it
-    const isOpen = () => hovering || input === root.activeElement;
+    const isOpen = () => hovering || (main && input === root.activeElement);
 
     function open() {
       bee.classList.add("open");
       vel.x = vel.y = 0;
-      if (input !== root.activeElement) {
+      if (main && input !== root.activeElement) {
         prevFocus = document.activeElement;
         input.focus({ preventScroll: true });
       }
@@ -198,6 +209,7 @@
     }
 
     function placeStack() {
+      if (!main) return;
       // keep the input/bubble fully on screen: flip below the bee near the top
       // edge, and shift sideways near the left/right edges
       stack.classList.toggle("below", pos.y < stack.offsetHeight + 8);
@@ -205,7 +217,7 @@
       stack.style.left = `${left}px`;
     }
 
-    function tick(now) {
+    function step(now) {
       const dt = Math.min(50, now - last) / 16.67; // frames at 60fps
       last = now;
 
@@ -241,9 +253,7 @@
 
       bee.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
       placeStack();
-      rafId = requestAnimationFrame(tick);
     }
-    rafId = requestAnimationFrame(tick);
 
     let leaveTimer = null;
     bee.addEventListener("mouseenter", () => {
@@ -257,23 +267,13 @@
         hovering = false;
         // nothing typed yet: give focus back to the page and fly on.
         // text in progress: stay open until the user clicks elsewhere.
-        if (!input.value && input === root.activeElement) {
+        if (main && !input.value && input === root.activeElement) {
           input.blur();
           prevFocus?.focus?.({ preventScroll: true });
         }
         close();
       }, 250);
     });
-    input.addEventListener("blur", close);
-
-    // keep keystrokes from triggering the page's own keyboard shortcuts
-    for (const type of ["keydown", "keyup", "keypress"]) {
-      input.addEventListener(type, (e) => e.stopPropagation());
-    }
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") input.blur();
-    });
-
     function spin() {
       spinWrap.classList.remove("bee-spin");
       void spinWrap.offsetWidth; // restart animation
@@ -282,7 +282,20 @@
 
     spinWrap.addEventListener("click", () => {
       spin();
-      input.focus({ preventScroll: true });
+      if (main) input.focus({ preventScroll: true });
+    });
+
+    const remove = () => bee.remove();
+    if (!main) return { step, setSkin, remove };
+
+    input.addEventListener("blur", close);
+
+    // keep keystrokes from triggering the page's own keyboard shortcuts
+    for (const type of ["keydown", "keyup", "keypress"]) {
+      input.addEventListener(type, (e) => e.stopPropagation());
+    }
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") input.blur();
     });
 
     // ---- chat ----
@@ -417,6 +430,9 @@
     bee.classList.toggle("peer-online", !!chat.peer?.online);
 
     return {
+      step,
+      setSkin,
+      remove,
       onChat(prev) {
         refreshPlaceholder();
         const online = !!chat.peer?.online;
@@ -425,9 +441,6 @@
           showBubble(chat.peer.name, "is online now 👋", { notice: true, ms: 5000 });
           spin();
         }
-      },
-      setSkin() {
-        flip.innerHTML = BuzzyBeeArt.svg(skin, { width: SIZE, uid: "page" });
       },
       onIncoming({ messages, missed }) {
         if (!messages?.length) return;
@@ -439,24 +452,45 @@
     };
   }
 
-  function removeBee() {
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = null;
-    host?.remove();
-    host = null;
-    ui = null;
+  function loop(now) {
+    for (const b of bees) b.step(now);
+    rafId = requestAnimationFrame(loop);
   }
 
-  function apply(enabled) {
-    if (enabled && !host) ui = createBee();
-    else if (!enabled && host) removeBee();
+  // add or remove bees until the page matches the settings
+  function sync(enabled) {
+    const want = enabled ? Math.min(Math.max(beeCount | 0, 1), BuzzyBeeArt.MAX_BEES) : 0;
+    if (want && !host) {
+      host = document.createElement("buzzy-bee-root");
+      root = host.attachShadow({ mode: "closed" });
+      root.innerHTML = `<style>${BuzzyBeeArt.CSS}${STYLE}</style>`;
+      document.documentElement.appendChild(host);
+      rafId = requestAnimationFrame(loop);
+    }
+    while (bees.length < want) bees.push(createBee(bees.length));
+    while (bees.length > want) bees.pop().remove();
+    if (!want && host) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+      host.remove();
+      host = root = null;
+    }
   }
 
-  chrome.storage.local.get({ beeEnabled: false, conn: "unconfigured", peer: null, skin: null }, (s) => {
-    skin = s.skin;
+  let enabled = false;
+  const ui = () => bees[0]; // the chat bee, if any
+
+  const SAVED = {
+    beeEnabled: false, beeCount: 1, conn: "unconfigured", peer: null,
+    skin: null, randomOutfits: false, randomSeed: 1,
+  };
+  chrome.storage.local.get(SAVED, (s) => {
+    Object.assign(looks, { skin: s.skin, randomOutfits: s.randomOutfits, randomSeed: s.randomSeed });
+    beeCount = s.beeCount;
     chat.conn = s.conn;
     chat.peer = s.peer;
-    apply(s.beeEnabled);
+    enabled = s.beeEnabled;
+    sync(enabled);
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
@@ -465,13 +499,15 @@
       const prev = { ...chat };
       if ("conn" in changes) chat.conn = changes.conn.newValue;
       if ("peer" in changes) chat.peer = changes.peer.newValue;
-      ui?.onChat(prev);
+      ui()?.onChat(prev);
     }
-    if ("incoming" in changes && changes.incoming.newValue) ui?.onIncoming(changes.incoming.newValue);
-    if ("skin" in changes) {
-      skin = changes.skin.newValue;
-      ui?.setSkin();
+    if ("incoming" in changes && changes.incoming.newValue) ui()?.onIncoming(changes.incoming.newValue);
+    if (["skin", "randomOutfits", "randomSeed"].some((k) => k in changes)) {
+      for (const k of ["skin", "randomOutfits", "randomSeed"]) if (k in changes) looks[k] = changes[k].newValue;
+      for (const b of bees) b.setSkin();
     }
-    if ("beeEnabled" in changes) apply(changes.beeEnabled.newValue);
+    if ("beeCount" in changes) beeCount = changes.beeCount.newValue;
+    if ("beeEnabled" in changes) enabled = changes.beeEnabled.newValue;
+    if ("beeCount" in changes || "beeEnabled" in changes) sync(enabled);
   });
 })();

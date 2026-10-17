@@ -182,6 +182,50 @@
     }
   }
 
+  // ---- random looks ----
+
+  // small seeded PRNG (mulberry32): the same seed gives the same bees in every tab
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  const BODY_COLORS = ["#ffd23f", "#ffa62b", "#ffb3d1", "#9ef0c8", "#8b7cf8", "#7ad3ff", "#ffe066", "#ff8c69", "#c3f584", "#f4f1de"];
+  const DARK_COLORS = ["#3b2a14", "#1d1d1d", "#2b2363", "#1f7a5a", "#5b2a86", "#264653", "#c1121f", "#3a86ff"];
+  const BRIGHT_COLORS = ["#e63946", "#ff006e", "#3a86ff", "#2ecc71", "#ffcc33", "#8338ec", "#fb8500", "#2b2b2b", "#3d405b", "#ff5fa2"];
+  const WING_COLORS = ["#e3f6ff", "#fff0f7", "#e8fff6", "#d9d4ff", "#fff7d6", "#eaf4ff"];
+
+  function randomSkin(seed, index) {
+    const r = rng(Math.imul(seed | 0, 31) + index * 7919 + 1);
+    const pick = (list) => list[Math.floor(r() * list.length)];
+    const option = (key) => pick(OPTIONS[key])[0];
+    return normalize({
+      body: pick(BODY_COLORS),
+      stripes: pick(DARK_COLORS),
+      antenna: pick([...DARK_COLORS, ...BRIGHT_COLORS]),
+      wings: pick(WING_COLORS),
+      wingStyle: option("wingStyle"),
+      pattern: option("pattern"),
+      hat: option("hat"),
+      hatColor: pick(BRIGHT_COLORS),
+      glasses: option("glasses"),
+      outfit: option("outfit"),
+      outfitColor: pick(BRIGHT_COLORS),
+    });
+  }
+
+  const MAX_BEES = 7;
+
+  // the look of bee number `index`, given the saved settings
+  function skinForBee(index, { skin, randomOutfits, randomSeed }) {
+    return randomOutfits ? randomSkin(randomSeed || 1, index) : normalize(skin);
+  }
+
   // width: rendered px width; uid: unique per SVG on the same page (clip-path ids)
   function svg(skinIn, { width = 110, uid = "bee" } = {}) {
     const k = normalize(skinIn);
@@ -274,5 +318,5 @@
   100% { opacity: 0; transform: scale(1.4); }
 }`;
 
-  globalThis.BuzzyBeeArt = { DEFAULT_SKIN, OPTIONS, PRESETS, normalize, svg, CSS };
+  globalThis.BuzzyBeeArt = { DEFAULT_SKIN, OPTIONS, PRESETS, MAX_BEES, normalize, randomSkin, skinForBee, svg, CSS };
 })();

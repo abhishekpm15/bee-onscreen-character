@@ -28,8 +28,22 @@
   </nav>
 
   <section id="panel-style" role="tabpanel" aria-labelledby="tab-style">
-    <div class="preview"><div class="preview-bee" id="preview"></div></div>
+    <div class="preview" id="preview"></div>
 
+    <h2>Swarm</h2>
+    <div class="swarm">
+      <div class="stepper" role="group" aria-label="Number of bees">
+        <button type="button" id="dec" aria-label="Fewer bees">−</button>
+        <output id="count" aria-live="polite">1</output>
+        <button type="button" id="inc" aria-label="More bees">+</button>
+        <span id="count-label">bee</span>
+      </div>
+      <label class="check"><input type="checkbox" id="random"> Random outfit for each bee</label>
+      <button type="button" id="shuffle" hidden>🎲 Shuffle outfits</button>
+    </div>
+
+    <div id="custom">
+    <p class="locked-hint" id="locked-hint" hidden>Random outfits are on. Turn them off to dress your bee yourself.</p>
     <h2>Skins</h2>
     <div class="presets" id="presets"></div>
 
@@ -40,6 +54,7 @@
     <div class="parts" id="parts"></div>
 
     <button type="button" id="reset" class="link">Reset to classic</button>
+    </div>
   </section>
 
   <section id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
