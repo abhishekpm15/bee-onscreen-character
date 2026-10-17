@@ -20,9 +20,30 @@
     <span class="switch" aria-hidden="true"></span>
   </label>
 
-  <section class="chat">
+  <nav class="tabs" role="tablist">
+    <button type="button" role="tab" id="tab-style" aria-controls="panel-style" aria-selected="true">Style</button>
+    <button type="button" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="false">
+      Chat <span id="tab-dot" class="tab-dot" hidden></span>
+    </button>
+  </nav>
+
+  <section id="panel-style" role="tabpanel" aria-labelledby="tab-style">
+    <div class="preview"><div class="preview-bee" id="preview"></div></div>
+
+    <h2>Skins</h2>
+    <div class="presets" id="presets"></div>
+
+    <h2>Colors</h2>
+    <div class="colors" id="colors"></div>
+
+    <h2>Accessories</h2>
+    <div class="parts" id="parts"></div>
+
+    <button type="button" id="reset" class="link">Reset to classic</button>
+  </section>
+
+  <section id="panel-chat" role="tabpanel" aria-labelledby="tab-chat" hidden>
     <div class="chat-head">
-      <h2>Chat</h2>
       <span id="conn" class="conn"><span class="dot"></span><span id="conn-text">Not set up</span></span>
     </div>
 
@@ -41,6 +62,7 @@
     <p class="hint">Your friend enters the same room code to chat with you.</p>
   </section>
 
+  <script src="bee-art.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

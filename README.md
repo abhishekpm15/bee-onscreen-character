@@ -6,6 +6,7 @@ messages between you and one friend.
 ## Parts
 
 - `manifest.json`, `content.js`, `background.js`, `popup.*`, `icons/` — the extension
+- `bee-art.js` — draws the bee from a skin (colors, hat, glasses, outfit, wings, pattern); shared by the page and the popup's Style tab
 - `server/` — a tiny WebSocket relay both extensions connect to
 
 ## Run the server locally (for testing)
