@@ -57,6 +57,26 @@
 .bee-input.error { border-color: #d64545; animation: shake 0.3s; }
 .bee.open .bee-input { display: block; }
 
+.bee-to {
+  display: none;
+  align-self: flex-start;
+  max-width: 100%;
+  margin-bottom: 4px;
+  padding: 3px 8px;
+  border: 2px solid #3b2a14;
+  border-radius: 999px;
+  background: #ffe9a8;
+  color: #3b2a14;
+  font: 600 12px/1.2 system-ui, -apple-system, "Segoe UI", sans-serif;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  pointer-events: auto;
+  cursor: pointer;
+  outline: none;
+}
+.bee-to:focus-visible { box-shadow: 0 0 0 3px rgba(255,194,26,0.5); }
+.bee.open .bee-to.has-friends { display: block; }
+.bee-compose { display: flex; flex-direction: column; }
+
 .bee-bubble {
   display: none;
   padding: 8px 12px;
@@ -137,7 +157,11 @@
   let trailLayer = null; // behind the bees
   let rafId = null;
   const bees = []; // bees[0] is the chat bee; the rest just fly around
-  const chat = { conn: "unconfigured", peer: null };
+  // friends: [{ code, label, name }], online: { [code]: name }, chatTo: code
+  const chat = { conn: "unconfigured", online: {}, friends: [], chatTo: "" };
+  const friendName = (f) => f.label || f.name || "your friend";
+  // who the chat bee is talking to: the chosen friend, else the first one
+  const chatFriend = () => chat.friends.find((f) => f.code === chat.chatTo) || chat.friends[0] || null;
   // look + swarm settings, from the popup's Style tab
   const looks = { skin: null, randomOutfits: false, randomSeed: 1 };
   let beeCount = 1;
@@ -152,7 +176,10 @@
         ${main ? `<div class="bee-stack">
           <div class="bee-bubble" role="status"><span class="from"></span><span class="text"></span></div>
           <div class="bee-messages" role="log" title="Click to dismiss"></div>
-          <input class="bee-input" type="text" maxlength="500" autocomplete="off">
+          <div class="bee-compose">
+            <select class="bee-to" aria-label="Send to"></select>
+            <input class="bee-input" type="text" maxlength="500" autocomplete="off">
+          </div>
         </div>` : ""}
         <div class="bee-spin-wrap"><div class="bee-bob"><div class="bee-flip"></div></div></div>`;
     root.append(bee);
@@ -160,6 +187,7 @@
     const flip = bee.querySelector(".bee-flip");
     const spinWrap = bee.querySelector(".bee-spin-wrap");
     const input = bee.querySelector(".bee-input");
+    const toSelect = bee.querySelector(".bee-to");
     const stack = bee.querySelector(".bee-stack");
     const bubble = bee.querySelector(".bee-bubble");
     const list = bee.querySelector(".bee-messages");
@@ -196,7 +224,7 @@
 
     let hovering = false;
     let prevFocus = null; // page element that had focus before we grabbed it
-    const isOpen = () => hovering || (main && input === root.activeElement);
+    const isOpen = () => hovering || (main && (input === root.activeElement || toSelect === root.activeElement));
 
     function open() {
       bee.classList.add("open");
@@ -309,10 +337,28 @@
     if (!main) return { step, setSkin, remove };
 
     input.addEventListener("blur", close);
+    toSelect.addEventListener("blur", close);
 
     // keep keystrokes from triggering the page's own keyboard shortcuts
     for (const type of ["keydown", "keyup", "keypress"]) {
       input.addEventListener(type, (e) => e.stopPropagation());
+      toSelect.addEventListener(type, (e) => e.stopPropagation());
+    }
+
+    toSelect.addEventListener("change", () => {
+      chat.chatTo = toSelect.value;
+      chrome.storage.local.set({ chatTo: toSelect.value });
+      refreshPlaceholder();
+      input.focus({ preventScroll: true });
+    });
+
+    function renderToSelect() {
+      const current = chatFriend();
+      toSelect.replaceChildren(...chat.friends.map((f) => {
+        const online = f.code in chat.online;
+        return new Option(`${online ? "🟢" : "⚪"} To: ${friendName(f)}`, f.code, false, f === current);
+      }));
+      toSelect.classList.toggle("has-friends", chat.friends.length > 0);
     }
     input.addEventListener("keydown", (e) => {
       if (e.key === "Escape") input.blur();
@@ -393,13 +439,14 @@
     list.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
 
     function refreshPlaceholder() {
-      const { conn, peer } = chat;
+      const { conn } = chat;
+      const friend = chatFriend();
       input.placeholder =
-        conn === "unconfigured" ? "Set up chat in the Buzzy menu first" :
-        conn === "room-full" ? "That room already has two people" :
+        conn === "unconfigured" ? "Enter your name in the Buzzy menu first" :
         conn !== "online" ? "Connecting to chat…" :
-        peer?.online ? `Message ${peer.name}…` :
-        "Friend is offline — they'll get it later";
+        !friend ? "Add a friend in the Buzzy menu first" :
+        friend.code in chat.online ? `Message ${friendName(friend)}…` :
+        `${friendName(friend)} is offline — they'll get it later`;
     }
 
     let statusTimer = null;
@@ -421,11 +468,12 @@
     async function sendTyped() {
       const text = input.value.trim();
       if (!text || sending) return;
-      if (chat.conn !== "online") return flashError(input.placeholder);
+      const friend = chatFriend();
+      if (chat.conn !== "online" || !friend) return flashError(input.placeholder);
       sending = true;
       let res;
       try {
-        res = await chrome.runtime.sendMessage({ type: "send", text });
+        res = await chrome.runtime.sendMessage({ type: "send", to: friend.code, text });
       } catch {
         res = { ok: false, reason: "extension-reloaded" };
       }
@@ -446,24 +494,36 @@
       }
     });
 
+    // antennae glow while any friend is online
+    const anyOnline = () => chat.friends.some((f) => f.code in chat.online);
+    renderToSelect();
     refreshPlaceholder();
-    bee.classList.toggle("peer-online", !!chat.peer?.online);
+    bee.classList.toggle("peer-online", anyOnline());
 
     return {
       step,
       setSkin,
       remove,
       onChat(prev) {
+        renderToSelect();
         refreshPlaceholder();
-        const online = !!chat.peer?.online;
-        bee.classList.toggle("peer-online", online);
-        if (online && !prev.peer?.online) {
-          showBubble(chat.peer.name, "is online now 👋", { notice: true, ms: 5000 });
+        bee.classList.toggle("peer-online", anyOnline());
+        const cameOnline = chat.friends.filter((f) => f.code in chat.online && !(f.code in (prev.online || {})));
+        if (cameOnline.length && prev.conn === "online" && chat.conn === "online") {
+          const names = cameOnline.map(friendName);
+          showBubble(names.length > 2 ? `${names.length} friends` : names.join(" & "),
+            names.length > 1 ? "are online now 👋" : "is online now 👋", { notice: true, ms: 5000 });
           spin();
         }
       },
       onIncoming({ messages, missed }) {
         if (!messages?.length) return;
+        // reply goes to whoever wrote last, unless a message to someone else is half-typed
+        const lastFrom = messages[messages.length - 1].fromCode;
+        if (lastFrom && !input.value && lastFrom !== chat.chatTo) {
+          chat.chatTo = lastFrom;
+          chrome.storage.local.set({ chatTo: lastFrom });
+        }
         addMessages(messages, missed);
         spin();
         // hover in place so the messages are easy to read
@@ -501,25 +561,24 @@
   let enabled = false;
   const ui = () => bees[0]; // the chat bee, if any
 
+  const CHAT_KEYS = ["conn", "online", "friends", "chatTo"];
   const SAVED = {
-    beeEnabled: false, beeCount: 1, conn: "unconfigured", peer: null,
+    beeEnabled: false, beeCount: 1, conn: "unconfigured", online: {}, friends: [], chatTo: "",
     skin: null, randomOutfits: false, randomSeed: 1,
   };
   chrome.storage.local.get(SAVED, (s) => {
     Object.assign(looks, { skin: s.skin, randomOutfits: s.randomOutfits, randomSeed: s.randomSeed });
     beeCount = s.beeCount;
-    chat.conn = s.conn;
-    chat.peer = s.peer;
+    for (const k of CHAT_KEYS) chat[k] = s[k];
     enabled = s.beeEnabled;
     sync(enabled);
   });
 
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
-    if ("conn" in changes || "peer" in changes) {
+    if (CHAT_KEYS.some((k) => k in changes)) {
       const prev = { ...chat };
-      if ("conn" in changes) chat.conn = changes.conn.newValue;
-      if ("peer" in changes) chat.peer = changes.peer.newValue;
+      for (const k of CHAT_KEYS) if (k in changes) chat[k] = changes[k].newValue ?? SAVED[k];
       ui()?.onChat(prev);
     }
     if ("incoming" in changes && changes.incoming.newValue) ui()?.onIncoming(changes.incoming.newValue);

@@ -1,13 +1,16 @@
 // Keeps one WebSocket to the chat server for the whole browser while the bee
-// is turned on (turning it off disconnects, so the friend sees you go offline),
+// is turned on (turning it off disconnects, so friends see you go offline),
 // and shares connection state with tabs through chrome.storage.local:
-//   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline" | "room-full"
-//   peer     { online, name } | null
-//   incoming { id, missed, messages: [{ from, text, ts }] }   (latest received batch)
+//   myCode   this browser's permanent bee code (friends add you with it)
+//   friends  [{ code, label, name }]  label is your nickname for them, name is what they call themselves
+//   chatTo   code of the friend the bee is messaging
+//   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline"
+//   online   { [code]: name }  friends online right now
+//   incoming { id, missed, messages: [{ fromCode, from, text, ts }] }   (latest received batch)
 
 const SERVER_URL = "wss://bee-onscreen-character.onrender.com";
-const DEFAULTS = { beeEnabled: false, room: "", name: "" };
-const SETTING_KEYS = ["beeEnabled", "room", "name"];
+const DEFAULTS = { beeEnabled: false, name: "", friends: [] };
+const SETTING_KEYS = ["beeEnabled", "name"];
 
 let ws = null;
 let connecting = false;
@@ -25,6 +28,48 @@ async function getClientId() {
   return clientId;
 }
 
+// Must match beeCode() in server/server.js. The code is a hash of the secret
+// client id, so it stays the same forever and can't be claimed by anyone else.
+const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
+async function beeCode(clientId) {
+  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(clientId)));
+  return [...hash.subarray(0, 10)].map((b) => ALPHABET[b % ALPHABET.length]).join("");
+}
+
+async function ensureMyCode() {
+  const myCode = await beeCode(await getClientId());
+  const { myCode: saved } = await chrome.storage.local.get("myCode");
+  if (saved !== myCode) await chrome.storage.local.set({ myCode });
+}
+
+// friends is edited by the popup too; serialize our own read-modify-writes
+let friendsQueue = Promise.resolve();
+function editFriends(fn) {
+  friendsQueue = friendsQueue.then(async () => {
+    const { friends = [] } = await chrome.storage.local.get("friends");
+    const next = fn(friends.map((f) => ({ ...f })));
+    if (next) await chrome.storage.local.set({ friends: next });
+  });
+  return friendsQueue;
+}
+
+// remember the name a friend goes by; add people who message us first
+function learnFriend(code, name) {
+  return editFriends((friends) => {
+    const f = friends.find((x) => x.code === code);
+    if (!f) return [...friends, { code, label: "", name }];
+    if (f.name === name) return null;
+    f.name = name;
+    return friends;
+  });
+}
+
+function sendFriends(friends) {
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ type: "friends", friends: friends.map((f) => f.code) }));
+  }
+}
+
 function scheduleRetry() {
   clearTimeout(retryTimer);
   retryTimer = setTimeout(connect, retryDelay);
@@ -40,13 +85,13 @@ async function connect() {
   if (connecting || (ws && ws.readyState <= WebSocket.OPEN)) return;
   connecting = true;
   try {
-    const { beeEnabled, room, name } = await chrome.storage.local.get(DEFAULTS);
+    const { beeEnabled, name } = await chrome.storage.local.get(DEFAULTS);
     if (!beeEnabled) {
-      await chrome.storage.local.set({ conn: "disabled", peer: null });
+      await chrome.storage.local.set({ conn: "disabled", online: {} });
       return;
     }
-    if (!room || !name) {
-      await chrome.storage.local.set({ conn: "unconfigured", peer: null });
+    if (!name) {
+      await chrome.storage.local.set({ conn: "unconfigured", online: {} });
       return;
     }
     const clientId = await getClientId();
@@ -56,7 +101,7 @@ async function connect() {
     try {
       sock = new WebSocket(SERVER_URL);
     } catch {
-      await chrome.storage.local.set({ conn: "offline", peer: null });
+      await chrome.storage.local.set({ conn: "offline", online: {} });
       scheduleRetry();
       return;
     }
@@ -64,13 +109,14 @@ async function connect() {
 
     sock.onopen = async () => {
       // the bee may have been turned off while this socket was opening
-      if (!(await chrome.storage.local.get(DEFAULTS)).beeEnabled) {
+      const s = await chrome.storage.local.get(DEFAULTS);
+      if (!s.beeEnabled) {
         if (ws === sock) ws = null;
         sock.close();
         return;
       }
       retryDelay = 1000;
-      sock.send(JSON.stringify({ type: "hello", room, clientId, name }));
+      sock.send(JSON.stringify({ type: "hello", clientId, name: s.name, friends: s.friends.map((f) => f.code) }));
       chrome.storage.local.set({ conn: "online" });
       // regular traffic also keeps the MV3 service worker from being suspended
       clearInterval(pingTimer);
@@ -94,41 +140,64 @@ async function connect() {
       ws = null;
       clearInterval(pingTimer);
       failPendingAcks();
-      const roomFull = e.code === 1008 && e.reason === "room full";
-      chrome.storage.local.set({ conn: roomFull ? "room-full" : "offline", peer: null });
-      if (!roomFull && e.code !== 4000) scheduleRetry();
+      chrome.storage.local.set({ conn: "offline", online: {} });
+      if (e.code !== 4000) scheduleRetry();
     };
   } finally {
     connecting = false;
   }
 }
 
+// presence updates arrive close together; apply them one at a time
+let onlineQueue = Promise.resolve();
+function editOnline(fn) {
+  onlineQueue = onlineQueue.then(async () => {
+    const { online = {} } = await chrome.storage.local.get("online");
+    await chrome.storage.local.set({ online: fn({ ...online }) });
+  });
+}
+
 async function handleServerMessage(msg) {
   switch (msg.type) {
     case "welcome": {
-      const p = msg.peers?.[0];
-      await chrome.storage.local.set({ peer: p ? { online: true, name: p.name } : { online: false, name: null } });
+      if (msg.code) await chrome.storage.local.set({ myCode: msg.code });
+      break;
+    }
+    case "online": {
+      const online = {};
+      for (const f of msg.friends || []) {
+        online[f.code] = f.name;
+        learnFriend(f.code, f.name);
+      }
+      editOnline(() => online);
       break;
     }
     case "presence": {
-      await chrome.storage.local.set({ peer: { online: msg.online, name: msg.name } });
+      editOnline((online) => {
+        if (msg.online) online[msg.code] = msg.name;
+        else delete online[msg.code];
+        return online;
+      });
+      learnFriend(msg.code, msg.name);
       break;
     }
     case "msg": {
-      const messages = [{ from: msg.from, text: msg.text, ts: msg.ts }];
+      await learnFriend(msg.fromCode, msg.from);
+      const messages = [{ fromCode: msg.fromCode, from: msg.from, text: msg.text, ts: msg.ts }];
       await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: false, messages } });
       break;
     }
     case "backlog": {
-      // everything the friend sent while we were offline, in order
-      const messages = (msg.messages || []).map(({ from, text, ts }) => ({ from, text, ts }));
+      // everything friends sent while we were offline, in order
+      const messages = (msg.messages || []).map(({ fromCode, from, text, ts }) => ({ fromCode, from, text, ts }));
+      for (const m of messages) await learnFriend(m.fromCode, m.from);
       if (messages.length) {
         await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: true, messages } });
       }
       break;
     }
     case "ack": {
-      pendingAcks.get(msg.id)?.({ ok: true, delivered: msg.delivered });
+      pendingAcks.get(msg.id)?.(msg.ok === false ? { ok: false, reason: "rejected" } : { ok: true, delivered: msg.delivered });
       pendingAcks.delete(msg.id);
       break;
     }
@@ -145,7 +214,7 @@ function reconnect() {
     if (old.readyState === WebSocket.OPEN) old.send('{"type":"bye"}');
     old.close();
   }
-  chrome.storage.local.set({ peer: null });
+  chrome.storage.local.set({ online: {} });
   connect();
 }
 
@@ -166,17 +235,31 @@ chrome.runtime.onMessage.addListener((req, sender, reply) => {
     clearTimeout(timer);
     reply(res);
   });
-  ws.send(JSON.stringify({ type: "msg", id, text: String(req.text).slice(0, 500) }));
+  ws.send(JSON.stringify({ type: "msg", id, to: String(req.to), text: String(req.text).slice(0, 500) }));
   return true; // reply asynchronously
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && SETTING_KEYS.some((k) => k in changes)) reconnect();
+  if (area !== "local") return;
+  if (SETTING_KEYS.some((k) => k in changes)) return reconnect();
+  if ("friends" in changes) {
+    // only tell the server when the set of codes changed, not on a rename
+    const codes = (list) => (list || []).map((f) => f.code).sort().join();
+    const { oldValue, newValue = [] } = changes.friends;
+    if (codes(oldValue) !== codes(newValue)) {
+      sendFriends(newValue);
+      // drop anyone just removed from the online list
+      const keep = new Set(newValue.map((f) => f.code));
+      editOnline((online) => Object.fromEntries(Object.entries(online).filter(([c]) => keep.has(c))));
+    }
+  }
 });
 
 // Content scripts only load into tabs opened after install, so inject the bee
 // into tabs that were already open. content.js guards against double-loading.
 chrome.runtime.onInstalled.addListener(async () => {
+  // room codes from earlier versions are replaced by permanent bee codes
+  chrome.storage.local.remove(["room", "peer"]);
   const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
   for (const tab of tabs) {
     chrome.scripting
@@ -191,4 +274,5 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "keepalive") connect();
 });
 chrome.runtime.onStartup.addListener(connect);
+ensureMyCode();
 connect();

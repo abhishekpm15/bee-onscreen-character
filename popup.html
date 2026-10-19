@@ -64,17 +64,34 @@
 
     <form id="settings">
       <label>Your name
-        <input id="name" maxlength="40" placeholder="e.g. Sam" required>
-      </label>
-      <label>Room code
         <span class="row">
-          <input id="room" maxlength="64" placeholder="Share this with your friend" required>
-          <button type="button" id="gen" title="Make a new random code">New</button>
+          <input id="name" maxlength="40" placeholder="e.g. Sam" required>
+          <button type="submit" id="save">Save</button>
         </span>
       </label>
-      <button type="submit" id="save">Save &amp; connect</button>
     </form>
-    <p class="hint">Your friend enters the same room code to chat with you.</p>
+
+    <h2>Your bee code</h2>
+    <div class="my-code">
+      <code id="my-code">…</code>
+      <button type="button" id="copy">Copy</button>
+    </div>
+    <p class="hint">Give this to friends so they can add you. It never changes.</p>
+
+    <h2>Friends</h2>
+    <ul id="friends" class="friends"></ul>
+    <p id="no-friends" class="hint">No friends yet. Add one with their bee code.</p>
+
+    <form id="add-friend" novalidate>
+      <label>Friend's bee code
+        <input id="friend-code" maxlength="20" placeholder="e.g. abcde-fghjk" autocomplete="off" spellcheck="false">
+      </label>
+      <label>Nickname (optional)
+        <input id="friend-label" maxlength="40" placeholder="e.g. Sam">
+      </label>
+      <button type="submit" id="add">Add friend</button>
+      <p id="add-error" class="error" hidden></p>
+    </form>
   </section>
 
   <script src="bee-art.js"></script>

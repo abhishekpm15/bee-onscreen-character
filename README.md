@@ -1,7 +1,7 @@
 # Buzzy the Bee
 
 A Chrome extension: a cartoon bee flies around your pages and carries chat
-messages between you and one friend.
+messages between you and your friends.
 
 ## Parts
 
@@ -34,9 +34,15 @@ The extension connects to `wss://bee-onscreen-character.onrender.com`
 
 1. Both people load the extension (`chrome://extensions` → Developer mode → Load unpacked).
 2. Open the Buzzy popup → **Chat**:
-   - **Your name** — what your friend sees
-   - **Room code** — click **New**, then send the code to your friend; they paste the same code
-3. Click **Save & connect**. When both are connected, each bee's antennae glow green
+   - **Your name** — what your friends see
+   - **Your bee code** — your permanent code. It is made from this browser's saved
+     ID, so it never changes; click **Copy** and send it to anyone you want to chat with
+   - **Friends** — paste a friend's bee code (and an optional nickname) and click
+     **Add friend**. Add as many friends as you like. Someone who messages you
+     first is added to your list automatically.
+3. When a friend is online, the dot next to them turns green, the bee's antennae glow,
    and it announces "*name* is online now 👋".
-4. Hover the bee, type, press **Enter**. Messages sent while your friend is offline
-   are held by the server and delivered when they come online (until the server restarts).
+4. Hover the bee, choose who to message in the **To:** picker above the box, type,
+   press **Enter**. When a message arrives, the picker switches to that friend so you
+   can reply straight away. Messages sent to an offline friend are held by the server
+   and delivered when they come online (until the server restarts).

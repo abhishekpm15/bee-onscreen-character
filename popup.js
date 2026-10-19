@@ -2,38 +2,81 @@ const toggle = document.getElementById("toggle");
 const status = document.getElementById("status");
 const form = document.getElementById("settings");
 const nameInput = document.getElementById("name");
-const roomInput = document.getElementById("room");
 const saveBtn = document.getElementById("save");
 const conn = document.getElementById("conn");
 const connText = document.getElementById("conn-text");
+const friendsEl = document.getElementById("friends");
+const addForm = document.getElementById("add-friend");
+const codeInput = document.getElementById("friend-code");
+const labelInput = document.getElementById("friend-label");
+const addError = document.getElementById("add-error");
+
+const chat = { conn: "unconfigured", online: {}, friends: [], myCode: "" };
 
 function render(enabled) {
   toggle.checked = enabled;
   status.textContent = enabled ? "Buzzy is flying around!" : "Buzzy is resting";
 }
 
-function renderConn({ conn: state = "unconfigured", peer = null }) {
+// bee codes are 10 characters; shown as "abcde-fghjk", typed any old way
+const CODE_RE = /^[a-hjkmnp-z2-9]{10}$/;
+const pretty = (code) => (code ? `${code.slice(0, 5)}-${code.slice(5)}` : "…");
+const cleanCode = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+const friendName = (f) => f.label || f.name || "New friend";
+
+function renderConn() {
+  const { conn: state, online } = chat;
   const labels = {
     disabled: "Off — turn on the bee to chat",
-    unconfigured: "Not set up",
+    unconfigured: "Enter your name to start",
     connecting: "Connecting…",
     offline: "Can't reach server",
-    "room-full": "Room is full",
   };
+  const live = chat.friends.filter((f) => f.code in online);
   let text = labels[state] ?? "Connected";
-  let level = state === "offline" || state === "room-full" ? "bad" : state === "online" ? "ok" : "";
+  let level = state === "offline" ? "bad" : state === "online" ? "ok" : "";
   if (state === "online") {
-    text = peer?.online ? `${peer.name} is online` : "Friend is offline";
-    level = peer?.online ? "live" : "ok";
+    text = live.length === 1 ? `${friendName(live[0])} is online` :
+      live.length ? `${live.length} friends online` : "Connected — no friends online";
+    level = live.length ? "live" : "ok";
   }
   connText.textContent = text;
   conn.className = `conn ${level}`;
-  document.getElementById("tab-dot").hidden = !(state === "online" && peer?.online);
+  document.getElementById("tab-dot").hidden = !(state === "online" && live.length);
+}
+
+function renderFriends() {
+  friendsEl.replaceChildren();
+  for (const f of chat.friends) {
+    const li = document.createElement("li");
+    li.className = f.code in chat.online ? "friend live" : "friend";
+    li.innerHTML = `<span class="dot"></span><span class="who"><b></b><small></small></span>
+      <button type="button" title="Remove friend">✕</button>`;
+    li.querySelector("b").textContent = friendName(f);
+    li.querySelector("small").textContent =
+      f.label && f.name && f.label !== f.name ? `${f.name} · ${pretty(f.code)}` : pretty(f.code);
+    const remove = li.querySelector("button");
+    remove.setAttribute("aria-label", `Remove ${friendName(f)}`);
+    remove.addEventListener("click", () => {
+      chrome.storage.local.set({ friends: chat.friends.filter((x) => x.code !== f.code) });
+    });
+    friendsEl.append(li);
+  }
+  document.getElementById("no-friends").hidden = chat.friends.length > 0;
+}
+
+function renderChat() {
+  document.getElementById("my-code").textContent = pretty(chat.myCode);
+  renderConn();
+  renderFriends();
 }
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !("conn" in changes || "peer" in changes)) return;
-  chrome.storage.local.get({ conn: "unconfigured", peer: null }, renderConn);
+  if (area !== "local") return;
+  const keys = ["conn", "online", "friends", "myCode"].filter((k) => k in changes);
+  if (!keys.length) return;
+  for (const k of keys) chat[k] = changes[k].newValue ?? (k === "online" ? {} : k === "friends" ? [] : "");
+  renderChat();
 });
 
 toggle.addEventListener("change", () => {
@@ -41,21 +84,42 @@ toggle.addEventListener("change", () => {
   render(toggle.checked);
 });
 
-document.getElementById("gen").addEventListener("click", () => {
-  const alphabet = "abcdefghjkmnpqrstuvwxyz23456789"; // no look-alike characters
-  const bytes = crypto.getRandomValues(new Uint8Array(10));
-  roomInput.value = [...bytes].map((b) => alphabet[b % alphabet.length]).join("");
+document.getElementById("copy").addEventListener("click", async (e) => {
+  if (!chat.myCode) return;
+  await navigator.clipboard.writeText(pretty(chat.myCode));
+  e.target.textContent = "Copied ✓";
+  setTimeout(() => (e.target.textContent = "Copy"), 1500);
 });
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  chrome.storage.local.set({
-    name: nameInput.value.trim(),
-    room: roomInput.value.trim(),
-  });
+  chrome.storage.local.set({ name: nameInput.value.trim() });
   saveBtn.textContent = "Saved ✓";
-  setTimeout(() => (saveBtn.textContent = "Save & connect"), 1500);
+  setTimeout(() => (saveBtn.textContent = "Save"), 1500);
 });
+
+addForm.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const code = cleanCode(codeInput.value);
+  const label = labelInput.value.trim();
+  const fail = (text) => {
+    addError.textContent = text;
+    addError.hidden = false;
+  };
+  if (!code) return fail("Paste your friend's bee code first.");
+  if (!CODE_RE.test(code)) return fail("That doesn't look like a bee code (10 letters and numbers).");
+  if (code === chat.myCode) return fail("That's your own code — share it with a friend instead.");
+  const existing = chat.friends.find((f) => f.code === code);
+  if (existing && !label) return fail(`${friendName(existing)} is already in your friends.`);
+  addError.hidden = true;
+  // adding someone already listed with a nickname just renames them
+  const friends = existing
+    ? chat.friends.map((f) => (f.code === code ? { ...f, label } : f))
+    : [...chat.friends, { code, label, name: "" }];
+  chrome.storage.local.set({ friends, chatTo: code });
+  codeInput.value = labelInput.value = "";
+});
+codeInput.addEventListener("input", () => (addError.hidden = true));
 
 // ---- tabs ----
 
@@ -229,7 +293,7 @@ document.getElementById("shuffle").addEventListener("click", () => setSwarm({ ra
 // load saved state last, once every element and function above exists
 chrome.storage.local.get(
   {
-    beeEnabled: false, name: "", room: "", conn: "unconfigured", peer: null,
+    beeEnabled: false, name: "", conn: "unconfigured", online: {}, friends: [], myCode: "",
     skin: null, beeCount: 1, randomOutfits: false, randomSeed: 1,
   },
   (s) => {
@@ -242,7 +306,7 @@ chrome.storage.local.get(
     });
     renderStyle();
     nameInput.value = s.name;
-    roomInput.value = s.room;
-    renderConn(s);
+    Object.assign(chat, { conn: s.conn, online: s.online, friends: s.friends, myCode: s.myCode });
+    renderChat();
   }
 );
