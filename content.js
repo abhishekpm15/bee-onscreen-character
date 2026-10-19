@@ -121,6 +121,7 @@
 .bee-messages .from { font-weight: 700; color: #b07d00; }
 .bee-messages .time { color: #a08b6c; }
 .bee-messages .msg.new { animation: pop 0.18s ease-out; }
+.bee-messages .msg.gone { opacity: 0; transition: opacity 0.3s; }
 
 .bee.open .bee-bob { animation-play-state: paused; }
 .trail-layer { position: fixed; inset: 0; z-index: 2147483646; overflow: hidden; pointer-events: none; }
@@ -382,18 +383,32 @@
       bubble.classList.remove("show");
     });
 
-    // received messages pile up in one scrollable list until it's dismissed or times out
+    // received messages share one scrollable list; each one fades out on its own
+    // MESSAGE_MS after it arrives, so a burst of messages never piles up
     const MAX_SHOWN = 30;
-    let listTimer = null;
+    const MESSAGE_MS = 8000;
     const timeFmt = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" });
 
-    function hideList() {
-      if (hovering) {
-        listTimer = setTimeout(hideList, 2000); // don't vanish while being read
-        return;
-      }
+    function clearList() {
       list.classList.remove("show");
       list.replaceChildren();
+    }
+
+    function expire(row) {
+      if (!row.isConnected) return; // already dismissed
+      if (hovering) {
+        setTimeout(() => expire(row), 2000); // don't vanish while being read
+        return;
+      }
+      row.classList.add("gone");
+      setTimeout(() => {
+        row.remove();
+        // drop a "While you were away" label once its messages are all gone
+        for (const label of list.querySelectorAll(".missed")) {
+          if (!label.nextElementSibling?.classList.contains("msg")) label.remove();
+        }
+        if (!list.querySelector(".msg")) clearList();
+      }, 300);
     }
 
     function addMessages(messages, missed) {
@@ -419,21 +434,16 @@
         text.textContent = m.text;
         row.append(meta, text);
         list.append(row);
+        setTimeout(() => expire(row), MESSAGE_MS);
       }
       while (list.querySelectorAll(".msg").length > MAX_SHOWN) list.firstElementChild.remove();
       list.classList.add("show");
       list.scrollTop = list.scrollHeight;
-
-      const count = list.querySelectorAll(".msg").length;
-      clearTimeout(listTimer);
-      listTimer = setTimeout(hideList, Math.min(60000, 10000 + 4000 * count));
     }
 
     list.addEventListener("click", (e) => {
       e.stopPropagation();
-      clearTimeout(listTimer);
-      list.classList.remove("show");
-      list.replaceChildren();
+      clearList();
     });
     // keep scrolling inside the list from scrolling the page
     list.addEventListener("wheel", (e) => e.stopPropagation(), { passive: true });
