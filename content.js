@@ -103,6 +103,7 @@
 .bee-messages .msg.new { animation: pop 0.18s ease-out; }
 
 .bee.open .bee-bob { animation-play-state: paused; }
+.trail-layer { position: fixed; inset: 0; z-index: 2147483646; overflow: hidden; pointer-events: none; }
 
 .bee-flip { transition: transform 0.35s ease; }
 .bee-flip.left { transform: scaleX(-1); }
@@ -133,6 +134,7 @@
 
   let host = null; // one shadow root holds every bee on the page
   let root = null;
+  let trailLayer = null; // behind the bees
   let rafId = null;
   const bees = []; // bees[0] is the chat bee; the rest just fly around
   const chat = { conn: "unconfigured", peer: null };
@@ -168,8 +170,11 @@
     // each bee bobs on its own rhythm so a swarm doesn't move in lockstep
     bee.querySelector(".bee-bob").style.animationDelay = `${-index * 0.37}s`;
 
+    let look = null;
+    let trailDist = 0;
     function setSkin() {
-      flip.innerHTML = BuzzyBeeArt.svg(BuzzyBeeArt.skinForBee(index, looks), { width: size, uid: `page-${index}` });
+      look = BuzzyBeeArt.skinForBee(index, looks);
+      flip.innerHTML = BuzzyBeeArt.svg(look, { width: size, uid: `page-${index}` });
     }
     setSkin();
 
@@ -245,6 +250,8 @@
       if (v > max) { vel.x = (vel.x / v) * max; vel.y = (vel.y / v) * max; }
 
       const b = bounds();
+      const prevX = pos.x;
+      const prevY = pos.y;
       pos.x = Math.min(Math.max(pos.x + vel.x * dt, 0), Math.max(0, b.maxX));
       pos.y = Math.min(Math.max(pos.y + vel.y * dt, TOP_PAD), Math.max(TOP_PAD, b.maxY));
 
@@ -253,6 +260,19 @@
 
       bee.style.transform = `translate(${pos.x}px, ${pos.y}px)`;
       placeStack();
+      leaveTrail(Math.hypot(pos.x - prevX, pos.y - prevY));
+    }
+
+    // drop a trail particle from the stinger every few px of flight
+    function leaveTrail(moved) {
+      const spacing = BuzzyBeeArt.TRAIL_SPACING[look.trail];
+      if (!spacing || reducedMotion) return;
+      trailDist += moved;
+      if (trailDist < spacing) return;
+      trailDist = 0;
+      const o = BuzzyBeeArt.TRAIL_ORIGIN;
+      const x = pos.x + w * (facingLeft ? 1 - o.x : o.x);
+      BuzzyBeeArt.spawnTrail(trailLayer, look.trail, look.trailColor, x, pos.y + h * o.y, { scale: size / SIZE });
     }
 
     let leaveTimer = null;
@@ -463,7 +483,8 @@
     if (want && !host) {
       host = document.createElement("buzzy-bee-root");
       root = host.attachShadow({ mode: "closed" });
-      root.innerHTML = `<style>${BuzzyBeeArt.CSS}${STYLE}</style>`;
+      root.innerHTML = `<style>${BuzzyBeeArt.CSS}${BuzzyBeeArt.TRAIL_CSS}${STYLE}</style><div class="trail-layer"></div>`;
+      trailLayer = root.querySelector(".trail-layer");
       document.documentElement.appendChild(host);
       rafId = requestAnimationFrame(loop);
     }
@@ -473,7 +494,7 @@
       cancelAnimationFrame(rafId);
       rafId = null;
       host.remove();
-      host = root = null;
+      host = root = trailLayer = null;
     }
   }
 

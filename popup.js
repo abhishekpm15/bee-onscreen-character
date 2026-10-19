@@ -83,6 +83,7 @@ const COLOR_FIELDS = [
   ["wings", "Wings"],
   ["hatColor", "Hat"],
   ["outfitColor", "Outfit"],
+  ["trailColor", "Trail"],
 ];
 const PART_FIELDS = [
   ["hat", "Hat"],
@@ -90,11 +91,12 @@ const PART_FIELDS = [
   ["outfit", "Outfit"],
   ["wingStyle", "Wings"],
   ["pattern", "Pattern"],
+  ["trail", "Trail"],
 ];
 
 // wing/blink animations for the preview bee
 const artStyle = document.createElement("style");
-artStyle.textContent = BuzzyBeeArt.CSS;
+artStyle.textContent = BuzzyBeeArt.CSS + BuzzyBeeArt.TRAIL_CSS;
 document.head.append(artStyle);
 
 const preview = document.getElementById("preview");
@@ -148,6 +150,9 @@ function renderStyle() {
     preview.append(b);
   }
   preview.classList.toggle("many", swarm.beeCount > 1);
+  previewTrail = document.createElement("div");
+  previewTrail.className = "preview-trail";
+  preview.append(previewTrail);
 
   document.getElementById("count").value = swarm.beeCount;
   document.getElementById("count-label").textContent = swarm.beeCount === 1 ? "bee" : "bees";
@@ -179,6 +184,31 @@ function update(next) {
     chrome.storage.local.set({ skin });
   }, 120);
 }
+
+// ---- preview trails ----
+// the preview bees hover in place, so particles drift left as if they were flying right
+
+let previewTrail = null;
+const trailDist = [];
+setInterval(() => {
+  if (!previewTrail || document.hidden) return;
+  const box = preview.getBoundingClientRect();
+  const looks = { skin, ...swarm };
+  preview.querySelectorAll(".preview-bee svg").forEach((el, i) => {
+    const look = skinForBee(i, looks);
+    const spacing = BuzzyBeeArt.TRAIL_SPACING[look.trail];
+    if (!spacing) return;
+    trailDist[i] = (trailDist[i] || 0) + 6;
+    if (trailDist[i] < spacing) return;
+    trailDist[i] = 0;
+    const r = el.getBoundingClientRect();
+    const o = BuzzyBeeArt.TRAIL_ORIGIN;
+    const scale = r.width / 110;
+    BuzzyBeeArt.spawnTrail(previewTrail, look.trail, look.trailColor,
+      r.left - box.left + r.width * o.x, r.top - box.top + r.height * o.y,
+      { scale, drift: [-50 * scale, 0] });
+  });
+}, 50);
 
 // ---- swarm ----
 

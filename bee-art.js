@@ -17,6 +17,8 @@
     glasses: "none",
     outfit: "none",
     outfitColor: "#e63946",
+    trail: "none",
+    trailColor: "#ffcc33",
   };
 
   const OPTIONS = {
@@ -25,18 +27,19 @@
     hat: [["none", "None"], ["tophat", "Top hat"], ["cap", "Cap"], ["beanie", "Beanie"], ["party", "Party hat"], ["crown", "Crown"], ["flower", "Flower"]],
     glasses: [["none", "None"], ["specs", "Specs"], ["shades", "Sunglasses"], ["hearts", "Heart shades"], ["monocle", "Monocle"]],
     outfit: [["none", "None"], ["coat", "Coat"], ["scarf", "Scarf"], ["bowtie", "Bow tie"], ["cape", "Cape"]],
+    trail: [["none", "None"], ["sparkles", "Sparkles"], ["hearts", "Hearts"], ["bubbles", "Bubbles"], ["rainbow", "Rainbow"], ["honey", "Honey drips"], ["dots", "Dotted path"]],
   };
 
   const PRESETS = [
     { id: "classic", name: "Classic", skin: {} },
     { id: "bumble", name: "Bumble", skin: { body: "#ffa62b", stripes: "#1d1d1d", antenna: "#1d1d1d", pattern: "thin" } },
     { id: "gentleman", name: "Gentleman", skin: { hat: "tophat", hatColor: "#2b2b2b", glasses: "specs", outfit: "coat", outfitColor: "#3d405b" } },
-    { id: "bubblegum", name: "Bubblegum", skin: { body: "#ffb3d1", stripes: "#ff5fa2", antenna: "#ff5fa2", wings: "#fff0f7", wingStyle: "heart", glasses: "hearts", outfit: "bowtie", outfitColor: "#ff5fa2" } },
-    { id: "midnight", name: "Midnight", skin: { body: "#8b7cf8", stripes: "#2b2363", antenna: "#ffd23f", wings: "#d9d4ff", wingStyle: "long", glasses: "shades", outfit: "scarf", outfitColor: "#ffd23f" } },
+    { id: "bubblegum", name: "Bubblegum", skin: { body: "#ffb3d1", stripes: "#ff5fa2", antenna: "#ff5fa2", wings: "#fff0f7", wingStyle: "heart", glasses: "hearts", outfit: "bowtie", outfitColor: "#ff5fa2", trail: "hearts", trailColor: "#ff5fa2" } },
+    { id: "midnight", name: "Midnight", skin: { body: "#8b7cf8", stripes: "#2b2363", antenna: "#ffd23f", wings: "#d9d4ff", wingStyle: "long", glasses: "shades", outfit: "scarf", outfitColor: "#ffd23f", trail: "sparkles", trailColor: "#ffd23f" } },
     { id: "mint", name: "Mint", skin: { body: "#9ef0c8", stripes: "#1f7a5a", antenna: "#1f7a5a", wings: "#e8fff6", wingStyle: "round", pattern: "dots", hat: "cap", hatColor: "#1f7a5a" } },
-    { id: "royal", name: "Royal", skin: { stripes: "#5b2a86", antenna: "#e63946", hat: "crown", hatColor: "#e63946", glasses: "monocle", outfit: "cape", outfitColor: "#c1121f" } },
-    { id: "party", name: "Party", skin: { body: "#ffe066", stripes: "#3a86ff", antenna: "#ff006e", hat: "party", hatColor: "#ff006e", outfit: "bowtie", outfitColor: "#3a86ff" } },
-    { id: "winter", name: "Winter", skin: { body: "#ffd23f", stripes: "#264653", antenna: "#264653", wings: "#eaf4ff", hat: "beanie", hatColor: "#e63946", outfit: "scarf", outfitColor: "#e63946" } },
+    { id: "royal", name: "Royal", skin: { stripes: "#5b2a86", antenna: "#e63946", hat: "crown", hatColor: "#e63946", glasses: "monocle", outfit: "cape", outfitColor: "#c1121f", trail: "sparkles", trailColor: "#ffcc33" } },
+    { id: "party", name: "Party", skin: { body: "#ffe066", stripes: "#3a86ff", antenna: "#ff006e", hat: "party", hatColor: "#ff006e", outfit: "bowtie", outfitColor: "#3a86ff", trail: "rainbow" } },
+    { id: "winter", name: "Winter", skin: { body: "#ffd23f", stripes: "#264653", antenna: "#264653", wings: "#eaf4ff", hat: "beanie", hatColor: "#e63946", outfit: "scarf", outfitColor: "#e63946", trail: "bubbles", trailColor: "#7ad3ff" } },
   ];
 
   const isColor = (v) => typeof v === "string" && /^#[0-9a-f]{6}$/i.test(v);
@@ -216,6 +219,8 @@
       glasses: option("glasses"),
       outfit: option("outfit"),
       outfitColor: pick(BRIGHT_COLORS),
+      trail: option("trail"),
+      trailColor: pick([...BRIGHT_COLORS, ...BODY_COLORS]),
     });
   }
 
@@ -318,5 +323,105 @@
   100% { opacity: 0; transform: scale(1.4); }
 }`;
 
-  globalThis.BuzzyBeeArt = { DEFAULT_SKIN, OPTIONS, PRESETS, MAX_BEES, normalize, randomSkin, skinForBee, svg, CSS };
+  // ---- trails ----
+
+  // where particles come out, as a fraction of the bee's box (the stinger)
+  const TRAIL_ORIGIN = { x: 0.07, y: 0.64 };
+  // distance in px a bee travels between particles
+  const TRAIL_SPACING = { sparkles: 12, hearts: 22, bubbles: 18, rainbow: 7, honey: 20, dots: 14 };
+  const MAX_PARTICLES = 160;
+  let rainbowHue = 0;
+
+  // Drop one trail particle into `layer` (a positioned, pointer-events:none box)
+  // at (x, y) in the layer's coordinates. `drift` adds motion, e.g. for a still preview.
+  function spawnTrail(layer, kind, color, x, y, { scale = 1, drift = [0, 0] } = {}) {
+    if (!TRAIL_SPACING[kind] || layer.childElementCount > MAX_PARTICLES) return;
+    const jitter = (n) => (Math.random() - 0.5) * n * scale;
+    const p = document.createElement("div");
+    p.className = `trail trail-${kind}`;
+    let size = 8 * scale;
+    let duration = 900;
+    let dx = jitter(12) + drift[0];
+    let dy = jitter(12) + drift[1];
+    let endScale = 0.3;
+    let rot = 0;
+    let spin = 0;
+    let c = isColor(color) ? color : DEFAULT_SKIN.trailColor;
+
+    switch (kind) {
+      case "sparkles":
+        size = (8 + Math.random() * 9) * scale;
+        duration = 850;
+        spin = 90;
+        endScale = 0.1;
+        break;
+      case "hearts":
+        size = (12 + Math.random() * 6) * scale;
+        duration = 1200;
+        dy -= 22 * scale;
+        rot = jitter(40);
+        endScale = 0.6;
+        p.textContent = "\u2665";
+        break;
+      case "bubbles":
+        size = (6 + Math.random() * 11) * scale;
+        duration = 1500;
+        dy -= 34 * scale;
+        endScale = 1.15;
+        break;
+      case "rainbow":
+        size = 10 * scale;
+        duration = 1000;
+        dx = drift[0];
+        dy = drift[1] + 4 * scale;
+        endScale = 0.2;
+        rainbowHue = (rainbowHue + 22) % 360;
+        c = `hsl(${rainbowHue} 90% 62%)`;
+        break;
+      case "honey":
+        size = (7 + Math.random() * 5) * scale;
+        duration = 1100;
+        dx = jitter(4) + drift[0];
+        dy = 34 * scale + drift[1];
+        rot = 45;
+        endScale = 0.7;
+        break;
+      case "dots":
+        size = 4.5 * scale;
+        duration = 1800;
+        dx = drift[0];
+        dy = drift[1];
+        endScale = 0.6;
+        break;
+    }
+
+    size *= 1.5; // all sizes above are at 2/3 of the final size
+    if (kind === "hearts") p.style.fontSize = `${size}px`;
+    p.style.width = p.style.height = `${size}px`;
+    p.style.left = `${x - size / 2}px`;
+    p.style.top = `${y - size / 2}px`;
+    p.style.setProperty("--c", c);
+    layer.append(p);
+
+    const frames = [
+      { transform: `translate(0, 0) rotate(${rot}deg) scale(1)`, opacity: 1 },
+      { transform: `translate(${dx}px, ${dy}px) rotate(${rot + spin}deg) scale(${endScale})`, opacity: 0 },
+    ];
+    if (kind === "sparkles") {
+      frames.splice(1, 0, { offset: 0.35, transform: `translate(${dx * 0.35}px, ${dy * 0.35}px) rotate(${spin * 0.35}deg) scale(1.3)`, opacity: 1 });
+    }
+    p.animate(frames, { duration, easing: kind === "honey" ? "ease-in" : "ease-out" }).onfinish = () => p.remove();
+  }
+
+  const TRAIL_CSS = `
+.trail { position: absolute; pointer-events: none; will-change: transform, opacity; box-sizing: border-box; }
+.trail-sparkles { background: var(--c); clip-path: polygon(50% 0, 61% 39%, 100% 50%, 61% 61%, 50% 100%, 39% 61%, 0 50%, 39% 39%); }
+.trail-hearts { display: flex; align-items: center; justify-content: center; color: var(--c); font-family: sans-serif; line-height: 1; text-shadow: 0 0 1px rgba(0,0,0,0.3); }
+.trail-bubbles { border: 2px solid var(--c); border-radius: 50%; background: radial-gradient(circle at 32% 30%, rgba(255,255,255,0.95) 0 14%, transparent 15%), color-mix(in srgb, var(--c) 18%, transparent); }
+.trail-rainbow, .trail-dots { background: var(--c); border-radius: 50%; }
+.trail-dots { opacity: 0.8; }
+.trail-honey { background: var(--c); border-radius: 0 50% 50% 50%; box-shadow: inset -2px -2px 0 rgba(0,0,0,0.12); }`;
+
+  globalThis.BuzzyBeeArt = { DEFAULT_SKIN, OPTIONS, PRESETS, MAX_BEES, normalize, randomSkin, skinForBee, svg, CSS,
+    TRAIL_ORIGIN, TRAIL_SPACING, spawnTrail, TRAIL_CSS };
 })();

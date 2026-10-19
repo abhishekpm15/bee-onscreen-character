@@ -104,7 +104,9 @@ h2 { margin: 14px 0 8px; font-size: 12px; text-transform: uppercase; letter-spac
   background: radial-gradient(circle at 50% 60%, #fff 0%, #fff3d1 70%);
   border: 1px solid var(--track);
 }
-.preview-bee { animation: bob 1.4s ease-in-out infinite; }
+.preview { position: relative; overflow: hidden; }
+.preview-bee { position: relative; z-index: 1; animation: bob 1.4s ease-in-out infinite; }
+.preview-trail { position: absolute; inset: 0; pointer-events: none; }
 .preview.many .preview-bee.main { flex-basis: 100%; display: flex; justify-content: center; }
 
 .swarm { display: grid; gap: 8px; }
