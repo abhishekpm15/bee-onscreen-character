@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Buzzy the Bee",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "A cartoon bee that flutters around your screen and carries chat messages between you and a friend.",
   "permissions": ["storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
@@ -25,6 +25,11 @@
     "128": "icons/icon128.png"
   },
   "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["guard.js"],
+      "run_at": "document_start"
+    },
     {
       "matches": ["<all_urls>"],
       "js": ["bee-art.js", "content.js"],

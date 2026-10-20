@@ -340,7 +340,9 @@
     input.addEventListener("blur", close);
     toSelect.addEventListener("blur", close);
 
-    // keep keystrokes from triggering the page's own keyboard shortcuts
+    // keep keystrokes from triggering the page's own keyboard shortcuts.
+    // guard.js normally hides them from the page before they get here; this is
+    // the fallback for tabs where it couldn't load first
     for (const type of ["keydown", "keyup", "keypress"]) {
       input.addEventListener(type, (e) => e.stopPropagation());
       toSelect.addEventListener(type, (e) => e.stopPropagation());
@@ -361,10 +363,6 @@
       }));
       toSelect.classList.toggle("has-friends", chat.friends.length > 0);
     }
-    input.addEventListener("keydown", (e) => {
-      if (e.key === "Escape") input.blur();
-    });
-
     // ---- chat ----
 
     let bubbleTimer = null;
@@ -497,12 +495,20 @@
       flashStatus(res.delivered ? "Sent ✓" : "Saved — it'll arrive when they're online");
     }
 
-    input.addEventListener("keydown", (e) => {
+    function onInputKey(e) {
+      if (e.key === "Escape") input.blur();
       if (e.key === "Enter" && !e.isComposing) {
         e.preventDefault();
         sendTyped();
       }
-    });
+    }
+    input.addEventListener("keydown", onInputKey);
+    // with guard.js in place, key events stop at the window and arrive here instead
+    if (window.__buzzyGuard) {
+      window.__buzzyGuard.onKey = (e) => {
+        if (e.type === "keydown" && input.isConnected && root?.activeElement === input) onInputKey(e);
+      };
+    }
 
     // antennae glow while any friend is online
     const anyOnline = () => chat.friends.some((f) => f.code in chat.online);
