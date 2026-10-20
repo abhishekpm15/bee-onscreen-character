@@ -124,15 +124,27 @@ codeInput.addEventListener("input", () => (addError.hidden = true));
 // ---- tabs ----
 
 const tabs = [...document.querySelectorAll('[role="tab"]')];
+function selectTab(tab) {
+  for (const t of tabs) {
+    const on = t === tab;
+    t.setAttribute("aria-selected", String(on));
+    document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
+  }
+}
 for (const tab of tabs) {
   tab.addEventListener("click", () => {
-    for (const t of tabs) {
-      const on = t === tab;
-      t.setAttribute("aria-selected", String(on));
-      document.getElementById(t.getAttribute("aria-controls")).hidden = !on;
-    }
+    selectTab(tab);
+    try {
+      localStorage.setItem("popupTab", tab.id);
+    } catch {}
   });
 }
+// reopen on the tab that was showing when the popup last closed.
+// localStorage is synchronous, so the popup never flashes the wrong tab first
+try {
+  const saved = document.getElementById(localStorage.getItem("popupTab"));
+  if (tabs.includes(saved)) selectTab(saved);
+} catch {}
 
 // ---- style ----
 
