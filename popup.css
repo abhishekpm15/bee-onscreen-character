@@ -282,3 +282,5 @@ button:hover { background: #fff3d1; }
 .friend.inactive { opacity: 0.55; }
 #circle-count { margin-left: 4px; font-weight: 400; }
 #add-friend[hidden] { display: none; }
+/* sit right under the "Your circle" heading / list instead of a full hint gap */
+#no-friends, #circle-full { margin: 0 0 10px; }

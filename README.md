@@ -37,10 +37,10 @@ The extension connects to `wss://bee-onscreen-character.onrender.com`
    - **Your name** — what your friends see
    - **Your bee code** — your permanent code. It is made from this browser's saved
      ID, so it never changes; click **Copy** and send it to anyone you want to chat with
-   - **Your circle** — up to 3 close ones. Paste a friend's bee code (and an optional
-     nickname) and click **Add friend**. **Both of you must add each other** before
+   - **Your circle** — up to 3 close ones. Paste a friend's bee code (and, optionally, the
+     name you want to save them as) and click **Add friend**. **Both of you must add each other** before
      you can see each other online or chat; until then they show as
-     "⏳ Waiting for them to add you back". Someone who only knows your code can't
+     "⏳ Send them your code to connect". Someone who only knows your code can't
      message you or see when you're online. Removing a friend cuts them off the same way.
 3. When a friend is online, the dot next to them turns green, the bee's antennae glow,
    and it announces "*name* is online now 👋".

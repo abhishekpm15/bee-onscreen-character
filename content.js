@@ -457,7 +457,7 @@
         conn !== "online" ? "Connecting to chat…" :
         !friend ? "Add a friend in the Buzzy menu first" :
         friend.code in chat.online ? `Message ${friendName(friend)}…` :
-        !friend.confirmed ? `${friendName(friend)} hasn't added you back yet` :
+        !friend.confirmed ? `Send ${friendName(friend)} your code to connect` :
         `${friendName(friend)} is offline — they'll get it later`;
     }
 

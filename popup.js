@@ -58,7 +58,7 @@ function renderFriends() {
     li.querySelector("b").textContent = friendName(f);
     li.querySelector("small").textContent =
       i >= MAX_FRIENDS ? "Not active — over the 3-friend limit" :
-      !f.confirmed ? `⏳ Waiting for them to add you back · ${pretty(f.code)}` :
+      !f.confirmed ? `⏳ Send them your code to connect · ${pretty(f.code)}` :
       f.label && f.name && f.label !== f.name ? `${f.name} · ${pretty(f.code)}` : pretty(f.code);
     const remove = li.querySelector("button");
     remove.setAttribute("aria-label", `Remove ${friendName(f)}`);

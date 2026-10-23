@@ -80,15 +80,15 @@
 
     <h2>Your circle <span id="circle-count"></span></h2>
     <ul id="friends" class="friends"></ul>
-    <p id="no-friends" class="hint">No one yet. Add up to 3 close ones with their bee codes.</p>
+    <p id="no-friends" class="hint">Add up to 3 close ones with their bee codes.</p>
     <p id="circle-full" class="hint" hidden>Your circle is full. Remove someone to add another.</p>
 
     <form id="add-friend" novalidate>
       <label>Friend's bee code
         <input id="friend-code" maxlength="20" placeholder="e.g. abcde-fghjk" autocomplete="off" spellcheck="false">
       </label>
-      <label>Nickname (optional)
-        <input id="friend-label" maxlength="40" placeholder="e.g. Sam">
+      <label>Save them as (optional)
+        <input id="friend-label" maxlength="40" placeholder="e.g. Mom, Best friend">
       </label>
       <button type="submit" id="add">Add friend</button>
       <p id="add-error" class="error" hidden></p>
