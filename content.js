@@ -158,11 +158,13 @@
   let trailLayer = null; // behind the bees
   let rafId = null;
   const bees = []; // bees[0] is the chat bee; the rest just fly around
-  // friends: [{ code, label, name }], online: { [code]: name }, chatTo: code
+  // friends: [{ code, label, name, confirmed }], online: { [code]: name }, chatTo: code
   const chat = { conn: "unconfigured", online: {}, friends: [], chatTo: "" };
+  const MAX_FRIENDS = 3; // must match server/server.js and popup.js
+  const circle = () => chat.friends.slice(0, MAX_FRIENDS); // any beyond the limit are inactive
   const friendName = (f) => f.label || f.name || "your friend";
   // who the chat bee is talking to: the chosen friend, else the first one
-  const chatFriend = () => chat.friends.find((f) => f.code === chat.chatTo) || chat.friends[0] || null;
+  const chatFriend = () => circle().find((f) => f.code === chat.chatTo) || circle()[0] || null;
   // look + swarm settings, from the popup's Style tab
   const looks = { skin: null, randomOutfits: false, randomSeed: 1 };
   let beeCount = 1;
@@ -357,11 +359,11 @@
 
     function renderToSelect() {
       const current = chatFriend();
-      toSelect.replaceChildren(...chat.friends.map((f) => {
-        const online = f.code in chat.online;
-        return new Option(`${online ? "🟢" : "⚪"} To: ${friendName(f)}`, f.code, false, f === current);
+      toSelect.replaceChildren(...circle().map((f) => {
+        const icon = f.code in chat.online ? "🟢" : f.confirmed ? "⚪" : "⏳";
+        return new Option(`${icon} To: ${friendName(f)}`, f.code, false, f === current);
       }));
-      toSelect.classList.toggle("has-friends", chat.friends.length > 0);
+      toSelect.classList.toggle("has-friends", circle().length > 0);
     }
     // ---- chat ----
 
@@ -423,7 +425,8 @@
         meta.className = "meta";
         const from = document.createElement("span");
         from.className = "from";
-        from.textContent = m.from;
+        // your nickname for them, not whatever name they gave themselves
+        from.textContent = friendName(chat.friends.find((f) => f.code === m.fromCode) || { name: m.from });
         const time = document.createElement("span");
         time.className = "time";
         time.textContent = timeFmt.format(new Date(m.ts));
@@ -454,6 +457,7 @@
         conn !== "online" ? "Connecting to chat…" :
         !friend ? "Add a friend in the Buzzy menu first" :
         friend.code in chat.online ? `Message ${friendName(friend)}…` :
+        !friend.confirmed ? `${friendName(friend)} hasn't added you back yet` :
         `${friendName(friend)} is offline — they'll get it later`;
     }
 
@@ -511,7 +515,7 @@
     }
 
     // antennae glow while any friend is online
-    const anyOnline = () => chat.friends.some((f) => f.code in chat.online);
+    const anyOnline = () => circle().some((f) => f.code in chat.online);
     renderToSelect();
     refreshPlaceholder();
     bee.classList.toggle("peer-online", anyOnline());
@@ -524,7 +528,7 @@
         renderToSelect();
         refreshPlaceholder();
         bee.classList.toggle("peer-online", anyOnline());
-        const cameOnline = chat.friends.filter((f) => f.code in chat.online && !(f.code in (prev.online || {})));
+        const cameOnline = circle().filter((f) => f.code in chat.online && !(f.code in (prev.online || {})));
         if (cameOnline.length && prev.conn === "online" && chat.conn === "online") {
           const names = cameOnline.map(friendName);
           showBubble(names.length > 2 ? `${names.length} friends` : names.join(" & "),

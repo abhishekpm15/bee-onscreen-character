@@ -1,16 +1,18 @@
 // Buzzy chat relay: every browser has a permanent bee code (derived from its
-// secret client id), tells the server which friends' codes it wants to hear
-// about, and sends messages addressed to a friend's code. The server reports
-// friends coming online/offline and holds messages for friends who are offline.
+// secret client id) and a small circle of friends' codes. Two people can only
+// see each other online and exchange messages once BOTH have added each other,
+// so someone who merely knows your code gets nothing. Messages are held while
+// the friend is offline, or until they add you back.
 const http = require("http");
 const crypto = require("crypto");
 const { WebSocketServer } = require("ws");
 
 const PORT = process.env.PORT || 8080;
 const MAX_TEXT = 500;
-const MAX_PENDING = 50; // messages held per recipient while they're offline
-const MAX_PENDING_INBOXES = 5000; // offline recipients we hold messages for
-const MAX_FRIENDS = 200;
+const MAX_FRIENDS = 3; // must match MAX_FRIENDS in the extension
+const MAX_PENDING = 50; // messages held per recipient
+const MAX_PENDING_PER_SENDER = 10; // so one sender can't push out everyone else's messages
+const MAX_PENDING_INBOXES = 5000; // recipients we hold messages for
 
 // Must match beeCode() in background.js: the public code is a hash of the
 // secret client id, so nobody can claim someone else's code.
@@ -36,13 +38,9 @@ function send(ws, msg) {
   if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg));
 }
 
-function cleanCodes(list) {
-  return new Set((Array.isArray(list) ? list : []).map(String).filter((c) => CODE_RE.test(c)).slice(0, MAX_FRIENDS));
-}
-
-// online users who have `code` in their friends list
-function watchers(code) {
-  return [...users].filter(([c, u]) => c !== code && u.friends.has(code)).map(([, u]) => u);
+function cleanCodes(list, self) {
+  const codes = (Array.isArray(list) ? list : []).map(String).filter((c) => CODE_RE.test(c) && c !== self);
+  return new Set(codes.slice(0, MAX_FRIENDS));
 }
 
 function reachable(code) {
@@ -50,10 +48,44 @@ function reachable(code) {
   return u && u.ws.readyState === u.ws.OPEN ? u : null;
 }
 
-// tell this user which of its friends are online right now
-function sendOnlineFriends(ws, friends) {
-  const online = [...friends].map((c) => [c, reachable(c)]).filter(([, u]) => u);
-  send(ws, { type: "online", friends: online.map(([code, u]) => ({ code, name: u.name })) });
+// online friend `code` of `me` who has added `me` back, if any
+function mutualOnline(me, myCode, code) {
+  const u = reachable(code);
+  return u && me.friends.has(code) && u.friends.has(myCode) ? u : null;
+}
+
+// tell this user which of its (mutual) friends are online right now
+function sendOnlineFriends(me, myCode) {
+  const online = [...me.friends].map((c) => [c, mutualOnline(me, myCode, c)]).filter(([, u]) => u);
+  send(me.ws, { type: "online", friends: online.map(([code, u]) => ({ code, name: u.name })) });
+}
+
+// hand over held messages from people this user has added; the rest keep waiting
+function deliverPending(me, myCode) {
+  const box = pending.get(myCode);
+  if (!box) return;
+  const forMe = box.filter((p) => me.friends.has(p.fromCode));
+  const rest = box.filter((p) => !me.friends.has(p.fromCode));
+  if (rest.length) pending.set(myCode, rest);
+  else pending.delete(myCode);
+  if (forMe.length) {
+    send(me.ws, {
+      type: "backlog",
+      messages: forMe.map(({ fromCode, from, text, ts }) => ({ fromCode, from, text, ts })),
+    });
+  }
+}
+
+function hold(to, entry) {
+  let box = pending.get(to);
+  if (!box) {
+    if (pending.size >= MAX_PENDING_INBOXES) pending.delete(pending.keys().next().value); // oldest inbox
+    pending.set(to, (box = []));
+  }
+  const fromSender = box.filter((p) => p.fromCode === entry.fromCode);
+  if (fromSender.length >= MAX_PENDING_PER_SENDER) box.splice(box.indexOf(fromSender[0]), 1);
+  box.push(entry);
+  if (box.length > MAX_PENDING) box.shift();
 }
 
 wss.on("connection", (ws) => {
@@ -63,11 +95,22 @@ wss.on("connection", (ws) => {
   ws.isAlive = true;
   ws.on("pong", () => (ws.isAlive = true));
 
-  // remove this socket and tell its watchers; safe to call twice
+  // tell each of these codes, if they're a mutual friend online, whether we're online
+  function announce(codes, online) {
+    for (const c of codes) {
+      const u = mutualOnline(me, code, c);
+      if (u) send(u.ws, { type: "presence", code, online, name: me.name });
+    }
+  }
+
+  // remove this socket and tell its friends; safe to call twice
   function leave() {
     if (!me || users.get(code) !== me) return; // replaced by a newer socket
     users.delete(code);
-    for (const w of watchers(code)) send(w.ws, { type: "presence", code, online: false, name: me.name });
+    for (const c of me.friends) {
+      const u = reachable(c);
+      if (u && u.friends.has(code)) send(u.ws, { type: "presence", code, online: false, name: me.name });
+    }
   }
 
   ws.on("message", (raw) => {
@@ -95,24 +138,14 @@ wss.on("connection", (ws) => {
       me = {
         ws,
         name: String(msg.name || "").trim().slice(0, 40) || "Friend",
-        friends: cleanCodes(msg.friends),
+        friends: cleanCodes(msg.friends, code),
       };
       users.set(code, me);
 
       send(ws, { type: "welcome", code });
-      sendOnlineFriends(ws, me.friends);
-      // friends see us come online (again, if our name changed on reconnect)
-      for (const w of watchers(code)) send(w.ws, { type: "presence", code, online: true, name: me.name });
-
-      // deliver anything sent to us while we were offline
-      const forMe = pending.get(code);
-      pending.delete(code);
-      if (forMe?.length) {
-        send(ws, {
-          type: "backlog",
-          messages: forMe.map(({ fromCode, from, text, ts }) => ({ fromCode, from, text, ts })),
-        });
-      }
+      sendOnlineFriends(me, code);
+      announce(me.friends, true); // (again, if our name changed on reconnect)
+      deliverPending(me, code);
       return;
     }
 
@@ -126,29 +159,28 @@ wss.on("connection", (ws) => {
     }
 
     if (msg.type === "friends") {
-      me.friends = cleanCodes(msg.friends);
-      return sendOnlineFriends(ws, me.friends);
+      const before = me.friends;
+      const removed = [...before].filter((c) => !cleanCodes(msg.friends, code).has(c));
+      announce(removed, false); // still mutual at this point, so they hear we're gone
+      me.friends = cleanCodes(msg.friends, code);
+      announce([...me.friends].filter((c) => !before.has(c)), true);
+      sendOnlineFriends(me, code);
+      deliverPending(me, code); // messages from someone we just added back
+      return;
     }
 
     if (msg.type === "msg") {
       const to = String(msg.to || "");
       const text = String(msg.text || "").trim().slice(0, MAX_TEXT);
-      if (!text || !CODE_RE.test(to) || to === code) {
+      if (!text || !me.friends.has(to)) {
         return send(ws, { type: "ack", id: msg.id, ok: false });
       }
       const out = { type: "msg", fromCode: code, from: me.name, text, ts: Date.now() };
-      const friend = reachable(to);
-      if (friend) {
-        send(friend.ws, out);
-      } else {
-        let box = pending.get(to);
-        if (!box) {
-          if (pending.size >= MAX_PENDING_INBOXES) pending.delete(pending.keys().next().value); // oldest inbox
-          pending.set(to, (box = []));
-        }
-        box.push({ fromCode: code, from: me.name, text, ts: out.ts });
-        if (box.length > MAX_PENDING) box.shift();
-      }
+      const friend = mutualOnline(me, code, to);
+      // not online, or hasn't added us yet: hold it until they connect / add us.
+      // The ack doesn't say which, so a non-friend can't learn when someone is online.
+      if (friend) send(friend.ws, out);
+      else hold(to, { fromCode: code, from: me.name, text, ts: out.ts });
       send(ws, { type: "ack", id: msg.id, ok: true, delivered: !!friend });
     }
   });

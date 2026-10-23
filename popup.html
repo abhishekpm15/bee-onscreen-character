@@ -76,11 +76,12 @@
       <code id="my-code">…</code>
       <button type="button" id="copy">Copy</button>
     </div>
-    <p class="hint">Give this to friends so they can add you. It never changes.</p>
+    <p class="hint">Give this only to close ones. It never changes. You both need to add each other's code to chat.</p>
 
-    <h2>Friends</h2>
+    <h2>Your circle <span id="circle-count"></span></h2>
     <ul id="friends" class="friends"></ul>
-    <p id="no-friends" class="hint">No friends yet. Add one with their bee code.</p>
+    <p id="no-friends" class="hint">No one yet. Add up to 3 close ones with their bee codes.</p>
+    <p id="circle-full" class="hint" hidden>Your circle is full. Remove someone to add another.</p>
 
     <form id="add-friend" novalidate>
       <label>Friend's bee code

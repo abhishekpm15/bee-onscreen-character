@@ -23,6 +23,7 @@ const CODE_RE = /^[a-hjkmnp-z2-9]{10}$/;
 const pretty = (code) => (code ? `${code.slice(0, 5)}-${code.slice(5)}` : "…");
 const cleanCode = (text) => text.toLowerCase().replace(/[^a-z0-9]/g, "");
 const friendName = (f) => f.label || f.name || "New friend";
+const MAX_FRIENDS = 3; // must match server/server.js and content.js
 
 function renderConn() {
   const { conn: state, online } = chat;
@@ -32,7 +33,7 @@ function renderConn() {
     connecting: "Connecting…",
     offline: "Can't reach server",
   };
-  const live = chat.friends.filter((f) => f.code in online);
+  const live = chat.friends.slice(0, MAX_FRIENDS).filter((f) => f.code in online);
   let text = labels[state] ?? "Connected";
   let level = state === "offline" ? "bad" : state === "online" ? "ok" : "";
   if (state === "online") {
@@ -47,13 +48,17 @@ function renderConn() {
 
 function renderFriends() {
   friendsEl.replaceChildren();
-  for (const f of chat.friends) {
+  chat.friends.forEach((f, i) => {
     const li = document.createElement("li");
     li.className = f.code in chat.online ? "friend live" : "friend";
+    // friends saved before the limit existed stay listed, but only the first 3 can chat
+    if (i >= MAX_FRIENDS) li.classList.add("inactive");
     li.innerHTML = `<span class="dot"></span><span class="who"><b></b><small></small></span>
       <button type="button" title="Remove friend">✕</button>`;
     li.querySelector("b").textContent = friendName(f);
     li.querySelector("small").textContent =
+      i >= MAX_FRIENDS ? "Not active — over the 3-friend limit" :
+      !f.confirmed ? `⏳ Waiting for them to add you back · ${pretty(f.code)}` :
       f.label && f.name && f.label !== f.name ? `${f.name} · ${pretty(f.code)}` : pretty(f.code);
     const remove = li.querySelector("button");
     remove.setAttribute("aria-label", `Remove ${friendName(f)}`);
@@ -61,8 +66,12 @@ function renderFriends() {
       chrome.storage.local.set({ friends: chat.friends.filter((x) => x.code !== f.code) });
     });
     friendsEl.append(li);
-  }
+  });
+  const full = chat.friends.length >= MAX_FRIENDS;
   document.getElementById("no-friends").hidden = chat.friends.length > 0;
+  document.getElementById("circle-full").hidden = !full;
+  document.getElementById("circle-count").textContent = `${Math.min(chat.friends.length, MAX_FRIENDS)}/${MAX_FRIENDS}`;
+  addForm.hidden = full;
 }
 
 function renderChat() {
@@ -110,7 +119,8 @@ addForm.addEventListener("submit", (e) => {
   if (!CODE_RE.test(code)) return fail("That doesn't look like a bee code (10 letters and numbers).");
   if (code === chat.myCode) return fail("That's your own code — share it with a friend instead.");
   const existing = chat.friends.find((f) => f.code === code);
-  if (existing && !label) return fail(`${friendName(existing)} is already in your friends.`);
+  if (existing && !label) return fail(`${friendName(existing)} is already in your circle.`);
+  if (!existing && chat.friends.length >= MAX_FRIENDS) return fail("Your circle is full.");
   addError.hidden = true;
   // adding someone already listed with a nickname just renames them
   const friends = existing

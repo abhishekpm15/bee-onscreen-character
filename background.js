@@ -2,7 +2,8 @@
 // is turned on (turning it off disconnects, so friends see you go offline),
 // and shares connection state with tabs through chrome.storage.local:
 //   myCode   this browser's permanent bee code (friends add you with it)
-//   friends  [{ code, label, name }]  label is your nickname for them, name is what they call themselves
+//   friends  [{ code, label, name, confirmed }]  label is your nickname for them, name is
+//            what they call themselves, confirmed once we've seen they added us back
 //   chatTo   code of the friend the bee is messaging
 //   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline"
 //   online   { [code]: name }  friends online right now
@@ -53,15 +54,22 @@ function editFriends(fn) {
   return friendsQueue;
 }
 
-// remember the name a friend goes by; add people who message us first
+// The server only lets two people reach each other once both have added each
+// other, so hearing from a friend proves they added us back. Remember that, and
+// the name they go by. Codes we never added are ignored, never added for us.
 function learnFriend(code, name) {
   return editFriends((friends) => {
     const f = friends.find((x) => x.code === code);
-    if (!f) return [...friends, { code, label: "", name }];
-    if (f.name === name) return null;
+    if (!f || (f.name === name && f.confirmed)) return null;
     f.name = name;
+    f.confirmed = true;
     return friends;
   });
+}
+
+async function isFriend(code) {
+  const { friends = [] } = await chrome.storage.local.get("friends");
+  return friends.some((f) => f.code === code);
 }
 
 function sendFriends(friends) {
@@ -182,6 +190,7 @@ async function handleServerMessage(msg) {
       break;
     }
     case "msg": {
+      if (!(await isFriend(msg.fromCode))) break;
       await learnFriend(msg.fromCode, msg.from);
       const messages = [{ fromCode: msg.fromCode, from: msg.from, text: msg.text, ts: msg.ts }];
       await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: false, messages } });
@@ -189,7 +198,10 @@ async function handleServerMessage(msg) {
     }
     case "backlog": {
       // everything friends sent while we were offline, in order
-      const messages = (msg.messages || []).map(({ fromCode, from, text, ts }) => ({ fromCode, from, text, ts }));
+      const { friends = [] } = await chrome.storage.local.get("friends");
+      const messages = (msg.messages || [])
+        .filter((m) => friends.some((f) => f.code === m.fromCode))
+        .map(({ fromCode, from, text, ts }) => ({ fromCode, from, text, ts }));
       for (const m of messages) await learnFriend(m.fromCode, m.from);
       if (messages.length) {
         await chrome.storage.local.set({ incoming: { id: crypto.randomUUID(), missed: true, messages } });

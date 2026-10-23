@@ -256,7 +256,7 @@ button:hover { background: #fff3d1; }
 }
 .my-code code { font: 600 16px/1 ui-monospace, Menlo, monospace; letter-spacing: 0.06em; user-select: all; }
 
-.friends { display: grid; gap: 4px; margin: 0 0 10px; padding: 0; list-style: none; }
+.friends { display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px; margin: 0 0 10px; padding: 0; list-style: none; }
 .friends:empty { display: none; }
 .friend {
   display: flex;
@@ -270,7 +270,8 @@ button:hover { background: #fff3d1; }
 .friend .dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #c9bda6; }
 .friend.live .dot { background: #2ecc71; box-shadow: 0 0 0 3px rgba(46, 204, 113, 0.25); }
 .friend .who { flex: 1; min-width: 0; }
-.friend .who b, .friend .who small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.friend .who b, .friend .who small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.friend .who b { white-space: nowrap; }
 .friend .who small { color: var(--muted); font-size: 11px; font-family: ui-monospace, Menlo, monospace; }
 .friend button { padding: 2px 8px; font-weight: 400; color: var(--muted); }
 .friend button:hover { color: #b03636; }
@@ -278,3 +279,6 @@ button:hover { background: #fff3d1; }
 #add { justify-self: start; }
 .error { margin: 0; color: #b03636; font-size: 12px; }
 .error[hidden] { display: none; }
+.friend.inactive { opacity: 0.55; }
+#circle-count { margin-left: 4px; font-weight: 400; }
+#add-friend[hidden] { display: none; }
