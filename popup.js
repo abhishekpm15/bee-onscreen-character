@@ -50,9 +50,42 @@ function renderConn() {
   document.getElementById("tab-dot").hidden = !(state === "online" && live.length);
 }
 
+let removing = null; // code of the friend whose removal is waiting for a yes
+let focusAfterRender = null;
+
+function confirmRow(f) {
+  const li = document.createElement("li");
+  li.className = "friend confirm";
+  li.innerHTML = `<span class="who"><b></b><small>They won't be able to message you.</small></span>
+    <span class="actions"><button type="button" class="cancel">Cancel</button>
+    <button type="button" class="danger">Remove</button></span>`;
+  li.querySelector("b").textContent = `Are you sure you want to remove ${friendName(f)}?`;
+  const cancel = () => {
+    removing = null;
+    focusAfterRender = f.code;
+    renderFriends();
+  };
+  li.querySelector(".cancel").addEventListener("click", cancel);
+  li.querySelector(".danger").addEventListener("click", () => {
+    removing = null;
+    chrome.storage.local.set({ friends: chat.friends.filter((x) => x.code !== f.code) });
+  });
+  li.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") cancel();
+  });
+  return li;
+}
+
 function renderFriends() {
   friendsEl.replaceChildren();
+  if (!chat.friends.some((f) => f.code === removing)) removing = null;
   chat.friends.forEach((f, i) => {
+    if (f.code === removing) {
+      const li = confirmRow(f);
+      friendsEl.append(li);
+      if (focusAfterRender === f.code) li.querySelector(".cancel").focus();
+      return;
+    }
     const li = document.createElement("li");
     li.className = f.code in chat.online ? "friend live" : "friend";
     // friends saved before the limit existed stay listed, but only the first 3 can chat
@@ -67,10 +100,14 @@ function renderFriends() {
     const remove = li.querySelector("button");
     remove.setAttribute("aria-label", `Remove ${friendName(f)}`);
     remove.addEventListener("click", () => {
-      chrome.storage.local.set({ friends: chat.friends.filter((x) => x.code !== f.code) });
+      removing = f.code;
+      focusAfterRender = f.code;
+      renderFriends();
     });
     friendsEl.append(li);
+    if (focusAfterRender === f.code) remove.focus();
   });
+  focusAfterRender = null;
   const full = chat.friends.length >= MAX_FRIENDS;
   document.getElementById("no-friends").hidden = chat.friends.length > 0;
   document.getElementById("circle-full").hidden = !full;

@@ -280,6 +280,14 @@ button:hover { background: #fff3d1; }
 .error { margin: 0; color: #b03636; font-size: 12px; }
 .error[hidden] { display: none; }
 .friend.inactive { opacity: 0.55; }
+.friend.confirm { flex-wrap: wrap; padding: 8px 10px; background: #fff6f4; border-color: #f0c8c0; }
+.friend.confirm .who { flex-basis: 100%; }
+.friend.confirm .who b { white-space: normal; }
+.friend.confirm .who small { font-family: inherit; }
+.friend.confirm .actions { display: flex; gap: 6px; margin-left: auto; }
+.friend.confirm button { padding: 4px 10px; font-weight: 600; color: var(--text); }
+.friend.confirm button.danger { background: #b03636; border-color: #b03636; color: #fff; }
+.friend.confirm button.danger:hover { background: #962c2c; color: #fff; }
 #circle-count { margin-left: 4px; font-weight: 400; }
 #add-friend[hidden] { display: none; }
 /* sit right under the "Your circle" heading / list instead of a full hint gap */
