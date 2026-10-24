@@ -9,23 +9,40 @@ messages between you and a small circle of close friends.
 - `bee-art.js` — draws the bee from a skin (colors, hat, glasses, outfit, wings, pattern); shared by the page and the popup's Style tab
 - `server/` — a tiny WebSocket relay both extensions connect to
 
+## Server secret (required)
+
+Bee codes are made by the server from each browser's secret id using a private key,
+so nobody can work out someone else's code offline. The server refuses to start without it.
+
+Generate one once:
+
+```sh
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Keep it private (never commit it). **Changing it gives everyone a new code.**
+
 ## Run the server locally (for testing)
 
 ```sh
 cd server
 npm install
-npm start          # listens on ws://localhost:8080 (set PORT to change)
+SERVER_SECRET=<your key> npm start   # listens on ws://localhost:8080 (set PORT to change)
 ```
 
 ## Deploy the server (so your friend can reach it)
 
 Any host that runs Node and supports WebSockets works (Render, Railway, Fly.io, a VPS).
-Point it at the `server/` folder, with start command `npm start`. Hosts provide
-`PORT` automatically. Your server URL will look like `wss://your-app.onrender.com`
-(use `wss://`, not `https://`).
+Point it at the `server/` folder, with start command `npm start`, and add
+`SERVER_SECRET` in the host's environment settings (on Render: **Environment**).
+Hosts provide `PORT` automatically. Your server URL will look like
+`wss://your-app.onrender.com` (use `wss://`, not `https://`).
 
 Free tiers often sleep when idle; while asleep, presence and messages pause until
-it wakes. Use an always-on plan if that matters.
+it wakes, and held messages are lost. Use an always-on plan if that matters.
+
+The server only accepts connections from the extension (not websites), and limits
+connections per IP, message rate, and how many messages anyone can leave waiting.
 
 ## Connect
 
@@ -35,8 +52,9 @@ The extension connects to `wss://bee-onscreen-character.onrender.com`
 1. Both people load the extension (`chrome://extensions` → Developer mode → Load unpacked).
 2. Open the Buzzy popup → **Chat**:
    - **Your name** — what your friends see
-   - **Your bee code** — your permanent code. It is made from this browser's saved
-     ID, so it never changes; click **Copy** and send it to anyone you want to chat with
+   - **Your bee code** — appears after the bee first connects. It's made by the server
+     from this browser's saved ID, so it never changes; click **Copy** and send it to
+     your close ones
    - **Your circle** — up to 3 close ones. Paste a friend's bee code (and, optionally, the
      name you want to save them as) and click **Add friend**. **Both of you must add each other** before
      you can see each other online or chat; until then they show as

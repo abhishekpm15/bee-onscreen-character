@@ -454,6 +454,7 @@
       const friend = chatFriend();
       input.placeholder =
         conn === "unconfigured" ? "Enter your name in the Buzzy menu first" :
+        conn === "outdated" ? "Update Buzzy to keep chatting" :
         conn !== "online" ? "Connecting to chat…" :
         !friend ? "Add a friend in the Buzzy menu first" :
         friend.code in chat.online ? `Message ${friendName(friend)}…` :

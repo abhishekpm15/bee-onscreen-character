@@ -1,15 +1,17 @@
 // Keeps one WebSocket to the chat server for the whole browser while the bee
 // is turned on (turning it off disconnects, so friends see you go offline),
 // and shares connection state with tabs through chrome.storage.local:
-//   myCode   this browser's permanent bee code (friends add you with it)
+//   myCode   this browser's permanent bee code (friends add you with it), as the server made it
 //   friends  [{ code, label, name, confirmed }]  label is your nickname for them, name is
 //            what they call themselves, confirmed once we've seen they added us back
 //   chatTo   code of the friend the bee is messaging
-//   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline"
+//   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline" | "outdated"
 //   online   { [code]: name }  friends online right now
 //   incoming { id, missed, messages: [{ fromCode, from, text, ts }] }   (latest received batch)
 
 const SERVER_URL = "wss://bee-onscreen-character.onrender.com";
+const PROTOCOL = 2; // must match PROTOCOL in server/server.js
+const CODE_VERSION = 2; // codes made by the server with its secret key
 const DEFAULTS = { beeEnabled: false, name: "", friends: [] };
 const SETTING_KEYS = ["beeEnabled", "name"];
 
@@ -27,20 +29,6 @@ async function getClientId() {
     await chrome.storage.local.set({ clientId });
   }
   return clientId;
-}
-
-// Must match beeCode() in server/server.js. The code is a hash of the secret
-// client id, so it stays the same forever and can't be claimed by anyone else.
-const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
-async function beeCode(clientId) {
-  const hash = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(clientId)));
-  return [...hash.subarray(0, 10)].map((b) => ALPHABET[b % ALPHABET.length]).join("");
-}
-
-async function ensureMyCode() {
-  const myCode = await beeCode(await getClientId());
-  const { myCode: saved } = await chrome.storage.local.get("myCode");
-  if (saved !== myCode) await chrome.storage.local.set({ myCode });
 }
 
 // friends is edited by the popup too; serialize our own read-modify-writes
@@ -124,7 +112,7 @@ async function connect() {
         return;
       }
       retryDelay = 1000;
-      sock.send(JSON.stringify({ type: "hello", clientId, name: s.name, friends: s.friends.map((f) => f.code) }));
+      sock.send(JSON.stringify({ type: "hello", v: PROTOCOL, clientId, name: s.name, friends: s.friends.map((f) => f.code) }));
       chrome.storage.local.set({ conn: "online" });
       // regular traffic also keeps the MV3 service worker from being suspended
       clearInterval(pingTimer);
@@ -148,8 +136,9 @@ async function connect() {
       ws = null;
       clearInterval(pingTimer);
       failPendingAcks();
-      chrome.storage.local.set({ conn: "offline", online: {} });
-      if (e.code !== 4000) scheduleRetry();
+      // 4001: the server needs a newer Buzzy; retrying won't help until the extension updates
+      chrome.storage.local.set({ conn: e.code === 4001 ? "outdated" : "offline", online: {} });
+      if (e.code !== 4000 && e.code !== 4001) scheduleRetry();
     };
   } finally {
     connecting = false;
@@ -168,7 +157,8 @@ function editOnline(fn) {
 async function handleServerMessage(msg) {
   switch (msg.type) {
     case "welcome": {
-      if (msg.code) await chrome.storage.local.set({ myCode: msg.code });
+      // the server makes the code from our secret id with its own key; we only display it
+      if (msg.code) await chrome.storage.local.set({ myCode: msg.code, codeVersion: CODE_VERSION });
       break;
     }
     case "online": {
@@ -269,9 +259,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Content scripts only load into tabs opened after install, so inject the bee
 // into tabs that were already open. content.js guards against double-loading.
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async ({ reason, previousVersion }) => {
   // room codes from earlier versions are replaced by permanent bee codes
   chrome.storage.local.remove(["room", "peer"]);
+  // 2.0 moved code-making to the server, so every code changed: codes saved before
+  // belong to nobody now. Start the circle fresh.
+  if (reason === "update" && parseInt(previousVersion, 10) < 2) {
+    await chrome.storage.local.set({ friends: [], chatTo: "", online: {}, incoming: null });
+  }
+  // the code may already have arrived from the new server; only drop one made the old way
+  const { codeVersion } = await chrome.storage.local.get("codeVersion");
+  if (codeVersion !== CODE_VERSION) await chrome.storage.local.remove("myCode");
   const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
   for (const tab of tabs) {
     chrome.scripting
@@ -286,5 +284,4 @@ chrome.alarms.onAlarm.addListener((a) => {
   if (a.name === "keepalive") connect();
 });
 chrome.runtime.onStartup.addListener(connect);
-ensureMyCode();
 connect();

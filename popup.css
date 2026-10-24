@@ -310,3 +310,5 @@ button:hover { background: #fff3d1; }
 .bmc span { font-size: 20px; }
 .bmc:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18); }
 .bmc:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.no-code { color: var(--muted); font-size: 12px; padding: 4px 0; }

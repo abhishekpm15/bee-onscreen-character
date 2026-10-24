@@ -35,10 +35,11 @@ function renderConn() {
     unconfigured: "Enter your name to start",
     connecting: "Connecting…",
     offline: "Can't reach server",
+    outdated: "Update Buzzy to keep chatting",
   };
   const live = chat.friends.slice(0, MAX_FRIENDS).filter((f) => f.code in online);
   let text = labels[state] ?? "Connected";
-  let level = state === "offline" ? "bad" : state === "online" ? "ok" : "";
+  let level = state === "offline" || state === "outdated" ? "bad" : state === "online" ? "ok" : "";
   if (state === "online") {
     text = live.length === 1 ? `${friendName(live[0])} is online` :
       live.length ? `${live.length} friends online` : "Connected — no friends online";
@@ -78,7 +79,11 @@ function renderFriends() {
 }
 
 function renderChat() {
-  document.getElementById("my-code").textContent = pretty(chat.myCode);
+  // the server makes the code, so there is none until the first connection
+  document.getElementById("my-code").textContent = chat.myCode ? pretty(chat.myCode) : "";
+  document.getElementById("my-code").hidden = !chat.myCode;
+  document.getElementById("no-code").hidden = !!chat.myCode;
+  document.getElementById("copy").hidden = !chat.myCode;
   renderConn();
   renderFriends();
 }
