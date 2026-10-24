@@ -134,6 +134,12 @@ section p.sub.flush { margin: 0; }
 @keyframes buzz-stripes { to { background-position: 39.6px 0; } }
 @media (prefers-reduced-motion: reduce) { .rupee:hover { animation: none; } }
 
+/* UPI QR: only on larger screens, since a phone can't scan its own screen
+   (phone visitors pay UPI through the Feed the bee button instead) */
+.upi-qr { margin: 22px auto 0; padding: 12px; width: max-content; border-radius: 16px; background: #fff; box-shadow: 0 2px 10px rgba(120, 80, 0, 0.1); }
+.upi-qr img { display: block; width: 200px; height: auto; }
+.upi-qr figcaption { margin-top: 8px; max-width: 200px; color: var(--muted); font-size: 13px; }
+
 /* ---- legal pages ---- */
 .doc { max-width: 720px; padding-top: 32px; padding-bottom: 56px; }
 .doc h1 { margin: 0 0 4px; font-size: 34px; color: var(--ink); letter-spacing: -0.01em; }
@@ -162,6 +168,10 @@ footer a:hover { color: var(--text); }
   section { padding: 40px 0; }
   .support { padding: 24px 16px; }
   .top nav { gap: 12px; }
+}
+
+@media (max-width: 760px) {
+  .upi-qr { display: none; }
 }
 
 @media (max-width: 420px) {

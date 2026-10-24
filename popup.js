@@ -189,6 +189,15 @@ if (SUPPORT_URL) {
   document.getElementById("bmc-link").href = SUPPORT_URL;
   giveBmc.hidden = false;
 }
+// UPI QR for scanning with a phone while the popup is open on a computer
+const qrToggle = document.getElementById("qr-toggle");
+const upiQr = document.getElementById("upi-qr");
+qrToggle.addEventListener("click", () => {
+  upiQr.hidden = !upiQr.hidden;
+  qrToggle.setAttribute("aria-expanded", String(!upiQr.hidden));
+  qrToggle.textContent = upiQr.hidden ? "📱 Show UPI QR code" : "Hide UPI QR code";
+});
+
 // people in India see the rupee option first (Chrome may report either name)
 const inIndia = ["Asia/Kolkata", "Asia/Calcutta"].includes(Intl.DateTimeFormat().resolvedOptions().timeZone);
 if (!inIndia) giveBmc.after(giveRazorpay);

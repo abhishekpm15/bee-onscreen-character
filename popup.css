@@ -300,6 +300,11 @@ button:hover { background: #fff3d1; }
 .give h2 { text-align: left; }
 .give .hint { margin-top: 6px; }
 .thanks { margin-top: 18px; text-align: center; }
+#qr-toggle { margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
+.upi-qr { margin: 8px auto 0; padding: 10px; width: max-content; border: 1px solid var(--track); border-radius: 12px; background: #fff; }
+.upi-qr[hidden] { display: none; }
+.upi-qr img { display: block; width: 180px; height: auto; margin: 0 auto; }
+.upi-qr figcaption { max-width: 180px; margin: 6px auto 0; color: var(--muted); font-size: 11px; }
 .site-links { display: flex; justify-content: center; gap: 6px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--track); color: var(--muted); font-size: 11px; }
 .site-links a { color: var(--muted); text-decoration: none; }
 .site-links a:hover { color: var(--text); text-decoration: underline; }
