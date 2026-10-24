@@ -2,7 +2,8 @@
   "manifest_version": 3,
   "name": "Buzzy the Bee",
   "version": "2.0.0",
-  "description": "A cartoon bee that flutters around your screen and carries chat messages between you and a friend.",
+  "description": "A cartoon bee that flutters around your screen and carries chat messages between you and your close friends.",
+  "homepage_url": "https://buzzythebee.netlify.app/",
   "permissions": ["storage", "scripting", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {

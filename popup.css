@@ -300,6 +300,9 @@ button:hover { background: #fff3d1; }
 .give h2 { text-align: left; }
 .give .hint { margin-top: 6px; }
 .thanks { margin-top: 18px; text-align: center; }
+.site-links { display: flex; justify-content: center; gap: 6px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--track); color: var(--muted); font-size: 11px; }
+.site-links a { color: var(--muted); text-decoration: none; }
+.site-links a:hover { color: var(--text); text-decoration: underline; }
 .razorpay {
   display: inline-flex;
   align-items: center;
