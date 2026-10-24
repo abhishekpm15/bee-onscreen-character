@@ -1,5 +1,6 @@
-// Buy Me a Coffee page behind the "Buy Me Some Honey" button; hidden while empty
+// donation pages on the Donate tab; each option is hidden while its link is empty
 const SUPPORT_URL = "https://buymeacoffee.com/pabhishekm";
+const RAZORPAY_URL = ""; // Razorpay Payment Page, e.g. https://rzp.io/l/...
 
 const toggle = document.getElementById("toggle");
 const status = document.getElementById("status");
@@ -176,10 +177,22 @@ addForm.addEventListener("submit", (e) => {
 });
 codeInput.addEventListener("input", () => (addError.hidden = true));
 
-if (SUPPORT_URL) {
-  document.getElementById("support-link").href = SUPPORT_URL;
-  document.getElementById("support").hidden = false;
+// ---- donate ----
+
+const giveRazorpay = document.getElementById("give-razorpay");
+const giveBmc = document.getElementById("give-bmc");
+if (RAZORPAY_URL) {
+  document.getElementById("razorpay-link").href = RAZORPAY_URL;
+  giveRazorpay.hidden = false;
 }
+if (SUPPORT_URL) {
+  document.getElementById("bmc-link").href = SUPPORT_URL;
+  giveBmc.hidden = false;
+}
+// people in India see the rupee option first (Chrome may report either name)
+const inIndia = ["Asia/Kolkata", "Asia/Calcutta"].includes(Intl.DateTimeFormat().resolvedOptions().timeZone);
+if (!inIndia) giveBmc.after(giveRazorpay);
+if (!RAZORPAY_URL && !SUPPORT_URL) document.getElementById("tab-donate").remove();
 
 // ---- tabs ----
 

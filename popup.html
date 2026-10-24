@@ -25,6 +25,7 @@
     <button type="button" role="tab" id="tab-chat" aria-controls="panel-chat" aria-selected="false">
       Chat <span id="tab-dot" class="tab-dot" hidden></span>
     </button>
+    <button type="button" role="tab" id="tab-donate" aria-controls="panel-donate" aria-selected="false">Donate</button>
   </nav>
 
   <section id="panel-style" role="tabpanel" aria-labelledby="tab-style">
@@ -96,11 +97,25 @@
     </form>
   </section>
 
-  <footer class="support" id="support" hidden>
-    <a id="support-link" class="bmc" target="_blank" rel="noopener">
-      <span aria-hidden="true">🐝</span> 🍯 Buy Me Some Honey
-    </a>
-  </footer>
+  <section id="panel-donate" role="tabpanel" aria-labelledby="tab-donate" hidden>
+    <p class="donate-intro">Buzzy is free. If it made you smile, feed the bee 🍯 — it helps keep the chat server flying.</p>
+
+    <div class="give" id="give-razorpay" hidden>
+      <h2>From India</h2>
+      <a id="razorpay-link" class="razorpay" target="_blank" rel="noopener">₹ Feed the bee</a>
+      <p class="hint">UPI, cards and net banking through Razorpay</p>
+    </div>
+
+    <div class="give" id="give-bmc" hidden>
+      <h2>From anywhere</h2>
+      <a id="bmc-link" class="bmc" target="_blank" rel="noopener">
+        <span aria-hidden="true">🍯</span> Buy me a honey
+      </a>
+      <p class="hint">International cards, in US dollars, through Buy Me a Coffee</p>
+    </div>
+
+    <p class="hint thanks">Thank you for keeping Buzzy buzzing 💛</p>
+  </section>
 
   <script src="bee-art.js"></script>
   <script src="popup.js"></script>
