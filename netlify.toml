@@ -1,0 +1,4 @@
+# Netlify: publish the Buzzy website (the extension and server live elsewhere in this repo).
+# Security headers are in website/_headers, so they also apply to drag-and-drop deploys.
+[build]
+  publish = "website"
