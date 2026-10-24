@@ -1,3 +1,6 @@
+// Buy Me a Coffee page behind the "Buy Me Some Honey" button; hidden while empty
+const SUPPORT_URL = "https://buymeacoffee.com/pabhishekm";
+
 const toggle = document.getElementById("toggle");
 const status = document.getElementById("status");
 const form = document.getElementById("settings");
@@ -130,6 +133,11 @@ addForm.addEventListener("submit", (e) => {
   codeInput.value = labelInput.value = "";
 });
 codeInput.addEventListener("input", () => (addError.hidden = true));
+
+if (SUPPORT_URL) {
+  document.getElementById("support-link").href = SUPPORT_URL;
+  document.getElementById("support").hidden = false;
+}
 
 // ---- tabs ----
 

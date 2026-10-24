@@ -284,3 +284,29 @@ button:hover { background: #fff3d1; }
 #add-friend[hidden] { display: none; }
 /* sit right under the "Your circle" heading / list instead of a full hint gap */
 #no-friends, #circle-full { margin: 0 0 10px; }
+
+/* Buy Me a Coffee's button, rebuilt locally: extensions can't load their remote script */
+@font-face {
+  font-family: "Cookie";
+  src: url("fonts/Cookie-Regular.woff2") format("woff2");
+  font-display: swap;
+}
+.support { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--track); text-align: center; }
+.support[hidden] { display: none; }
+.bmc {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 18px 6px;
+  border: 1px solid #000;
+  border-radius: 10px;
+  background: #ffdd00;
+  color: #000;
+  font: 26px/1.2 "Cookie", cursive;
+  text-decoration: none;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+.bmc span { font-size: 20px; }
+.bmc:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18); }
+.bmc:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
