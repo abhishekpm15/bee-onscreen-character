@@ -303,22 +303,39 @@ button:hover { background: #fff3d1; }
 .site-links { display: flex; justify-content: center; gap: 6px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--track); color: var(--muted); font-size: 11px; }
 .site-links a { color: var(--muted); text-decoration: none; }
 .site-links a:hover { color: var(--text); text-decoration: underline; }
+/* soft honey-striped button with gently striped brown text */
 .razorpay {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 200px;
-  padding: 10px 18px;
-  border-radius: 10px;
-  background: #072654;
-  color: #fff;
-  font-weight: 700;
-  font-size: 15px;
+  min-width: 210px;
+  height: 60px;
+  padding: 0 10px;
+  border-radius: 12px;
+  font: 700 20px/1 "Lato", sans-serif;
   text-decoration: none;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
-  transition: transform 0.15s, box-shadow 0.15s;
+  background: repeating-linear-gradient(-45deg, #fff3cc 0 14px, #ffe49a 14px 28px);
+  background-size: 39.6px 39.6px; /* one stripe period, so the slide loops seamlessly */
+  box-shadow: 0 0 0 1px #f3cf6b, 0 2px 6px rgba(160, 110, 0, 0.12);
+  transition: transform 0.15s;
 }
-.razorpay:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18); }
+.razorpay:hover { transform: translateY(-1px); }
+.razorpay .stripe-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 4px;
+}
+.razorpay .stripe-label b {
+  background: repeating-linear-gradient(180deg, #5c3b0c 0 5px, #8a5a14 5px 10px);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: 0.01em;
+}
+.razorpay:hover { animation: buzz-stripes 3s linear infinite; }
+@keyframes buzz-stripes { to { background-position: 39.6px 0; } }
+@media (prefers-reduced-motion: reduce) { .razorpay:hover { animation: none; } }
 .razorpay:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 /* Buy Me a Coffee's button, rebuilt locally: extensions can't load their remote script */

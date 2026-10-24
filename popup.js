@@ -1,6 +1,6 @@
 // donation pages on the Donate tab; each option is hidden while its link is empty
 const SUPPORT_URL = "https://buymeacoffee.com/pabhishekm";
-const RAZORPAY_URL = ""; // Razorpay Payment Page, e.g. https://rzp.io/l/...
+const RAZORPAY_URL = "https://rzp.io/rzp/mtZ0cki"; // Razorpay Payment Page
 
 const toggle = document.getElementById("toggle");
 const status = document.getElementById("status");
