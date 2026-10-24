@@ -492,9 +492,11 @@
       }
       sending = false;
       if (!res?.ok) {
-        return flashError(res?.reason === "extension-reloaded"
-          ? "Buzzy was updated — refresh this page"
-          : "Couldn't send. Try again in a moment.");
+        return flashError(
+          res?.reason === "extension-reloaded" ? "Buzzy was updated — refresh this page" :
+          res?.reason === "not-connected" ? `Not delivered — you're not connected with ${friendName(friend)}` :
+          res?.reason === "full" ? "Too many messages waiting — try again later" :
+          "Couldn't send. Try again in a moment.");
       }
       input.value = "";
       flashStatus(res.delivered ? "Sent ✓" : "Saved — it'll arrive when they're online");

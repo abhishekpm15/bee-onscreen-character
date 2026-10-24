@@ -3,7 +3,7 @@
 // and shares connection state with tabs through chrome.storage.local:
 //   myCode   this browser's permanent bee code (friends add you with it), as the server made it
 //   friends  [{ code, label, name, confirmed }]  label is your nickname for them, name is
-//            what they call themselves, confirmed once we've seen they added us back
+//            what they call themselves, confirmed while they have us in their circle too
 //   chatTo   code of the friend the bee is messaging
 //   conn     "disabled" | "unconfigured" | "connecting" | "online" | "offline" | "outdated"
 //   online   { [code]: name }  friends online right now
@@ -170,6 +170,20 @@ async function handleServerMessage(msg) {
       editOnline(() => online);
       break;
     }
+    case "links": {
+      // the server says which friends have us in their circle; false after one removes us
+      const links = msg.links || {};
+      editFriends((friends) => {
+        let changed = false;
+        for (const f of friends) {
+          if (typeof links[f.code] !== "boolean" || !!f.confirmed === links[f.code]) continue;
+          f.confirmed = links[f.code];
+          changed = true;
+        }
+        return changed ? friends : null;
+      });
+      break;
+    }
     case "presence": {
       editOnline((online) => {
         if (msg.online) online[msg.code] = msg.name;
@@ -199,7 +213,7 @@ async function handleServerMessage(msg) {
       break;
     }
     case "ack": {
-      pendingAcks.get(msg.id)?.(msg.ok === false ? { ok: false, reason: "rejected" } : { ok: true, delivered: msg.delivered });
+      pendingAcks.get(msg.id)?.(msg.ok === false ? { ok: false, reason: msg.reason || "rejected" } : { ok: true, delivered: msg.delivered });
       pendingAcks.delete(msg.id);
       break;
     }

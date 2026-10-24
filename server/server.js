@@ -141,6 +141,30 @@ function sendOnlineFriends(me, myCode) {
   send(me.ws, { type: "online", friends: online.map(([code, u]) => ({ code, name: u.name })) });
 }
 
+// Whether each of `me`'s friends has added `me` back, as far as the server knows
+// (a circle is only known once its owner has connected since the last restart).
+// Lets the client show "connected" vs "send them your code" truthfully, including
+// after a friend removes them, without ever saying "removed".
+function sendLinks(me, myCode) {
+  const links = {};
+  for (const c of me.friends) {
+    const circle = known.get(c);
+    if (circle) links[c] = circle.has(myCode);
+  }
+  send(me.ws, { type: "links", links });
+}
+
+// `myCode`'s circle went from `before` (undefined if unknown) to `next`: tell everyone
+// online who has added `myCode` whether they're in it now
+function tellCircleChange(myCode, before, next) {
+  for (const [c, u] of users) {
+    if (c === myCode || !u.friends.has(myCode)) continue;
+    const linked = next.has(c);
+    if (before && before.has(c) === linked) continue;
+    send(u.ws, { type: "links", links: { [myCode]: linked } });
+  }
+}
+
 function released(entries) {
   for (const p of entries) {
     const n = (heldBy.get(p.fromCode) || 1) - 1;
@@ -171,11 +195,12 @@ function deliverPending(me, myCode) {
   }
 }
 
+// returns null when held, else why not
 function hold(to, entry) {
   // the recipient's circle is known and the sender isn't in it: refuse
   const circle = known.get(to);
-  if (circle && !circle.has(entry.fromCode)) return;
-  if ((heldBy.get(entry.fromCode) || 0) >= MAX_HELD_BY_SENDER) return;
+  if (circle && !circle.has(entry.fromCode)) return "not-connected";
+  if ((heldBy.get(entry.fromCode) || 0) >= MAX_HELD_BY_SENDER) return "full";
 
   let box = pending.get(to);
   if (!box) {
@@ -187,6 +212,7 @@ function hold(to, entry) {
   box.push(entry);
   heldBy.set(entry.fromCode, (heldBy.get(entry.fromCode) || 0) + 1);
   if (box.length > MAX_PENDING) released([box.shift()]);
+  return null;
 }
 
 wss.on("connection", (ws, req) => {
@@ -260,9 +286,12 @@ wss.on("connection", (ws, req) => {
         friends: cleanCodes(msg.friends, code),
       };
       users.set(code, me);
+      const before = known.get(code);
       remember(code, me.friends);
 
       send(ws, { type: "welcome", code });
+      sendLinks(me, code);
+      tellCircleChange(code, before, me.friends); // the circle may have changed while offline
       sendOnlineFriends(me, code);
       announce(me.friends, true); // (again, if our name changed on reconnect)
       deliverPending(me, code);
@@ -285,6 +314,8 @@ wss.on("connection", (ws, req) => {
       announce([...before].filter((c) => !next.has(c)), false); // still mutual here, so they hear we're gone
       me.friends = next;
       remember(code, next);
+      tellCircleChange(code, before, next);
+      sendLinks(me, code);
       announce([...next].filter((c) => !before.has(c)), true);
       sendOnlineFriends(me, code);
       deliverPending(me, code); // messages from someone we just added back
@@ -301,11 +332,15 @@ wss.on("connection", (ws, req) => {
       }
       const out = { type: "msg", fromCode: code, from: me.name, text, ts: Date.now() };
       const friend = mutualOnline(me, code, to);
-      // not online, or hasn't added us yet: hold it until they connect / add us.
-      // The ack doesn't say which, so a non-friend can't learn when someone is online.
-      if (friend) send(friend.ws, out);
-      else hold(to, { fromCode: code, from: me.name, text, ts: out.ts });
-      send(ws, { type: "ack", id, ok: true, delivered: !!friend });
+      if (friend) {
+        send(friend.ws, out);
+        return send(ws, { type: "ack", id, ok: true, delivered: true });
+      }
+      // not online, or not connected: hold it, unless their circle is known and we're
+      // not in it. The answer depends only on the circle, never on whether they're
+      // online, so it doesn't tell a non-friend when someone is around.
+      const refused = hold(to, { fromCode: code, from: me.name, text, ts: out.ts });
+      send(ws, refused ? { type: "ack", id, ok: false, reason: refused } : { type: "ack", id, ok: true, delivered: false });
     }
   });
 
