@@ -294,54 +294,75 @@ button:hover { background: #fff3d1; }
 #no-friends, #circle-full { margin: 0 0 10px; }
 
 /* ---- donate panel ---- */
-.donate-intro { margin: 2px 0 4px; font-size: 13px; line-height: 1.45; }
-.give { text-align: center; }
-.give[hidden] { display: none; }
-.give h2 { text-align: left; }
-.give .hint { margin-top: 6px; }
-.thanks { margin-top: 18px; text-align: center; }
-#qr-toggle { margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--text); }
-.upi-qr { margin: 8px auto 0; padding: 10px; width: max-content; border: 1px solid var(--track); border-radius: 12px; background: #fff; }
-.upi-qr[hidden] { display: none; }
-.upi-qr img { display: block; width: 180px; height: auto; margin: 0 auto; }
-.upi-qr figcaption { max-width: 180px; margin: 6px auto 0; color: var(--muted); font-size: 11px; }
-.site-links { display: flex; justify-content: center; gap: 6px; margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--track); color: var(--muted); font-size: 11px; }
-.site-links a { color: var(--muted); text-decoration: none; }
-.site-links a:hover { color: var(--text); text-decoration: underline; }
-/* soft honey-striped button with gently striped brown text */
-.razorpay {
-  display: inline-flex;
+.give-hero {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #fff1c4, #ffe3a0);
+  box-shadow: inset 0 0 0 1px rgba(214, 160, 30, 0.25);
+}
+.give-hero img { flex: none; border-radius: 14px; box-shadow: 0 2px 6px rgba(140, 90, 0, 0.18); }
+.give-hero h3 { margin: 0 0 2px; font-size: 16px; color: #3b2a14; }
+.give-hero p { margin: 0; color: #6b5432; font-size: 12px; line-height: 1.4; }
+
+.give-switch { display: flex; gap: 4px; margin: 14px 0 12px; padding: 3px; border-radius: 10px; background: var(--track); }
+.give-switch[hidden] { display: none; }
+.give-switch button { flex: 1; padding: 6px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 12px; }
+.give-switch button:hover { background: rgba(255, 255, 255, 0.5); }
+.give-switch button[aria-pressed="true"] { background: #fff; color: var(--text); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12); }
+
+.give-pane { display: grid; gap: 10px; justify-items: center; }
+.give-pane[hidden] { display: none; }
+.give-switch[hidden] ~ .give-pane { margin-top: 14px; }
+
+.upi-qr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 10px 12px 10px 10px;
+  border: 1px solid var(--track);
+  border-radius: 14px;
+  background: #fff;
+}
+.upi-qr img { flex: none; width: 132px; height: auto; border-radius: 6px; }
+.upi-qr figcaption { color: var(--muted); font-size: 11px; line-height: 1.5; }
+.upi-qr figcaption b { display: block; margin-bottom: 2px; color: var(--text); font-size: 13px; }
+
+/* soft honey stripes, same family as the bee */
+.pay-link {
+  display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 210px;
-  height: 60px;
-  padding: 0 10px;
-  border-radius: 12px;
-  font: 700 20px/1 "Lato", sans-serif;
-  text-decoration: none;
-  background: repeating-linear-gradient(-45deg, #fff3cc 0 14px, #ffe49a 14px 28px);
-  background-size: 39.6px 39.6px; /* one stripe period, so the slide loops seamlessly */
-  box-shadow: 0 0 0 1px #f3cf6b, 0 2px 6px rgba(160, 110, 0, 0.12);
-  transition: transform 0.15s;
-}
-.razorpay:hover { transform: translateY(-1px); }
-.razorpay .stripe-label {
-  display: inline-flex;
-  align-items: center;
   gap: 6px;
-  padding: 0 4px;
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  background: repeating-linear-gradient(-45deg, #fff6d8 0 12px, #ffecb3 12px 24px);
+  background-size: 33.94px 33.94px; /* one stripe period, so the slide loops seamlessly */
+  box-shadow: inset 0 0 0 1px #f0d07a;
+  color: #5c3b0c;
+  font-weight: 700;
+  font-size: 13px;
+  text-decoration: none;
 }
-.razorpay .stripe-label b {
-  background: repeating-linear-gradient(180deg, #5c3b0c 0 5px, #8a5a14 5px 10px);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  letter-spacing: 0.01em;
-}
-.razorpay:hover { animation: buzz-stripes 3s linear infinite; }
-@keyframes buzz-stripes { to { background-position: 39.6px 0; } }
-@media (prefers-reduced-motion: reduce) { .razorpay:hover { animation: none; } }
-.razorpay:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+.pay-link:hover { animation: buzz-stripes 3s linear infinite; color: #3b2a14; }
+.pay-link span { transition: transform 0.15s; }
+.pay-link:hover span { transform: translateX(2px); }
+@keyframes buzz-stripes { to { background-position: 33.94px 0; } }
+@media (prefers-reduced-motion: reduce) { .pay-link:hover { animation: none; } }
+.pay-link:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+.give-pane .bmc { width: 100%; justify-content: center; }
+.give-note { margin: 0; color: var(--muted); font-size: 11px; text-align: center; }
+
+.thanks { margin: 16px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+.site-links { display: flex; justify-content: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--track); color: var(--muted); font-size: 11px; }
+.site-links a { color: var(--muted); text-decoration: none; }
+.site-links a:hover { color: var(--text); text-decoration: underline; }
 
 /* Buy Me a Coffee's button, rebuilt locally: extensions can't load their remote script */
 @font-face {

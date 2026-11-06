@@ -179,29 +179,36 @@ codeInput.addEventListener("input", () => (addError.hidden = true));
 
 // ---- donate ----
 
-const giveRazorpay = document.getElementById("give-razorpay");
-const giveBmc = document.getElementById("give-bmc");
-if (RAZORPAY_URL) {
-  document.getElementById("razorpay-link").href = RAZORPAY_URL;
-  giveRazorpay.hidden = false;
+// one way to give at a time: UPI/Razorpay for India, Buy Me a Coffee elsewhere
+const panes = { india: document.getElementById("pane-india"), world: document.getElementById("pane-world") };
+const giveSwitch = document.getElementById("give-switch");
+const available = { india: !!RAZORPAY_URL, world: !!SUPPORT_URL };
+if (RAZORPAY_URL) document.getElementById("razorpay-link").href = RAZORPAY_URL;
+if (SUPPORT_URL) document.getElementById("bmc-link").href = SUPPORT_URL;
+
+function showPane(name) {
+  for (const [key, pane] of Object.entries(panes)) pane.hidden = key !== name;
+  for (const b of giveSwitch.querySelectorAll("button")) b.setAttribute("aria-pressed", String(b.dataset.pane === name));
 }
-if (SUPPORT_URL) {
-  document.getElementById("bmc-link").href = SUPPORT_URL;
-  giveBmc.hidden = false;
-}
-// UPI QR for scanning with a phone while the popup is open on a computer
-const qrToggle = document.getElementById("qr-toggle");
-const upiQr = document.getElementById("upi-qr");
-qrToggle.addEventListener("click", () => {
-  upiQr.hidden = !upiQr.hidden;
-  qrToggle.setAttribute("aria-expanded", String(!upiQr.hidden));
-  qrToggle.textContent = upiQr.hidden ? "📱 Show UPI QR code" : "Hide UPI QR code";
+giveSwitch.addEventListener("click", (e) => {
+  const name = e.target.closest("button")?.dataset.pane;
+  if (!name) return;
+  showPane(name);
+  try {
+    localStorage.setItem("donatePane", name);
+  } catch {}
 });
 
-// people in India see the rupee option first (Chrome may report either name)
-const inIndia = ["Asia/Kolkata", "Asia/Calcutta"].includes(Intl.DateTimeFormat().resolvedOptions().timeZone);
-if (!inIndia) giveBmc.after(giveRazorpay);
-if (!RAZORPAY_URL && !SUPPORT_URL) document.getElementById("tab-donate").remove();
+// start where the person last looked, else by timezone (Chrome may report either name for India)
+let firstPane = ["Asia/Kolkata", "Asia/Calcutta"].includes(Intl.DateTimeFormat().resolvedOptions().timeZone) ? "india" : "world";
+try {
+  const saved = localStorage.getItem("donatePane");
+  if (saved in panes) firstPane = saved;
+} catch {}
+if (!available[firstPane]) firstPane = available.india ? "india" : "world";
+giveSwitch.hidden = !(available.india && available.world);
+showPane(firstPane);
+if (!available.india && !available.world) document.getElementById("tab-donate").remove();
 
 // ---- tabs ----
 

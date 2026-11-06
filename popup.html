@@ -98,28 +98,35 @@
   </section>
 
   <section id="panel-donate" role="tabpanel" aria-labelledby="tab-donate" hidden>
-    <p class="donate-intro">Buzzy is free. If it made you smile, feed the bee 🍯 — it helps keep the chat server flying.</p>
-
-    <div class="give" id="give-razorpay" hidden>
-      <h2>From India</h2>
-      <a id="razorpay-link" class="razorpay" target="_blank" rel="noopener"><span class="stripe-label"><span aria-hidden="true">🐝</span><b>₹ Feed the bee</b></span></a>
-      <p class="hint">UPI, cards and net banking through Razorpay</p>
-      <button type="button" id="qr-toggle" class="link" aria-expanded="false" aria-controls="upi-qr">📱 Show UPI QR code</button>
-      <figure id="upi-qr" class="upi-qr" hidden>
-        <img src="images/upi-qr.png" alt="UPI QR code to support Buzzy" width="180" height="240">
-        <figcaption>Scan with GPay, PhonePe, Paytm or any UPI app</figcaption>
-      </figure>
+    <div class="give-hero">
+      <img src="icons/icon128.png" alt="" width="52" height="52">
+      <div>
+        <h3>Feed the bee</h3>
+        <p>Buzzy is free and made by one person. A little honey keeps the chat server flying.</p>
+      </div>
     </div>
 
-    <div class="give" id="give-bmc" hidden>
-      <h2>From anywhere</h2>
+    <div class="give-switch" id="give-switch" role="group" aria-label="Where are you giving from?">
+      <button type="button" data-pane="india" aria-pressed="true">🇮🇳 India</button>
+      <button type="button" data-pane="world" aria-pressed="false">🌍 Elsewhere</button>
+    </div>
+
+    <div class="give-pane" id="pane-india" hidden>
+      <figure class="upi-qr">
+        <img src="images/upi-qr.png" alt="UPI QR code to support Buzzy" width="150" height="200">
+        <figcaption><b>Scan with any UPI app</b>GPay · PhonePe · Paytm · BHIM</figcaption>
+      </figure>
+      <a id="razorpay-link" class="pay-link" target="_blank" rel="noopener">Pay by card or net banking <span aria-hidden="true">→</span></a>
+    </div>
+
+    <div class="give-pane" id="pane-world" hidden>
       <a id="bmc-link" class="bmc" target="_blank" rel="noopener">
         <span aria-hidden="true">🍯</span> Buy me a honey
       </a>
-      <p class="hint">International cards, in US dollars, through Buy Me a Coffee</p>
+      <p class="give-note">International cards, in US dollars, through Buy Me a Coffee</p>
     </div>
 
-    <p class="hint thanks">Thank you for keeping Buzzy buzzing 💛</p>
+    <p class="thanks">Thank you for keeping Buzzy buzzing 💛</p>
 
     <nav class="site-links" aria-label="About Buzzy">
       <a href="https://buzzythebee.netlify.app/" target="_blank" rel="noopener">Website</a>
